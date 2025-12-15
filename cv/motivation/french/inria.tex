@@ -1,0 +1,117 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc} % Specify UTF-8 input encoding for accented characters
+\usepackage[T1]{fontenc} % Use T1 font encoding so guillemets (« ») are available
+\usepackage{charter} % Use the Charter font
+\usepackage{graphicx} % For \includegraphics
+\usepackage{fancyhdr}       % Required for customizing headers and footers
+\usepackage[french]{babel} % Proper French hyphenation and shorthands
+
+\DeclareUnicodeCharacter{0301}{*************************************}
+\usepackage[
+	a4paper,    % Paper size
+	top=1in,    % Top margin
+	bottom=1in, % Bottom margin
+	left=1in,   % Left margin
+	right=1in,  % Right margin
+	%showframe  % Uncomment to show frames around the margins for debugging purposes
+]{geometry}
+
+\setlength{\parindent}{0pt}     % Paragraph indentation 
+\setlength{\parskip}{1em}       % Vertical space between paragraphs
+
+
+\fancypagestyle{firstpage}{%
+	\fancyhf{} % Clear default headers/footers
+	\renewcommand{\headrulewidth}{0pt} % No header rule
+	\renewcommand{\footrulewidth}{1pt} % Footer rule thickness
+}
+
+\fancypagestyle{subsequentpages}{%
+	\fancyhf{} % Clear default headers/footers
+	\renewcommand{\headrulewidth}{1pt} % Header rule thickness
+	\renewcommand{\footrulewidth}{1pt} % Footer rule thickness
+}
+
+\AtBeginDocument{\thispagestyle{firstpage}} % Use the first page headers/footers style on the first page
+\pagestyle{subsequentpages} % Use the subsequent pages headers/footers style on subsequent pages
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+%----------------------------------------------------------------------------------------
+%	FIRST PAGE HEADER
+%----------------------------------------------------------------------------------------
+
+% \includegraphics[width=0.5\textwidth]{../logo-ipparis.png} % Logo (converted from SVG)
+
+% \vspace{-1em} % Pull the rule closer to the logo
+
+% \rule{\linewidth}{1pt} % Horizontal rule
+
+\bigskip\bigskip % Vertical whitespace
+
+%----------------------------------------------------------------------------------------
+%	YOUR NAME AND CONTACT INFORMATION
+%----------------------------------------------------------------------------------------
+
+\hfill
+\begin{tabular}{l @{}}
+	\today \bigskip\\ % Date
+	Augustin Bresset \\
+	36 Rue des Gravilliers, 75003 \\ % Address
+	Phone: +33 6 51 09 26 88 \\
+	Email: augustin.bresset@ip-paris.fr
+\end{tabular}
+
+\bigskip % Vertical whitespace
+
+%----------------------------------------------------------------------------------------
+%	ADDRESSEE AND GREETING
+%----------------------------------------------------------------------------------------
+
+\begin{tabular}{@{} l}
+    Dr.\ Emmanuel De Bézenac \\
+    Research Scientist, ARCHES Team \\
+    Inria Paris \\
+    2 Rue Simone Iff \\
+    75012 Paris, France
+\end{tabular}
+
+\bigskip % Vertical whitespace
+
+Cher Dr.\ De Bézenac,
+
+\bigskip % Vertical whitespace
+
+%----------------------------------------------------------------------------------------
+%	LETTER CONTENT
+%----------------------------------------------------------------------------------------
+
+Je vous écris pour vous faire part de mon intérêt pour le stage de recherche M2 intitulé « Développer des modèles génératifs efficaces pour la prévision météorologique », au sein de l'équipe ARCHES à Inria Paris. 
+Actuellement en double diplôme entre le Master Data Science de l'école Polytechnique et le cursus d'ingénieur à Télécom SudParis, je recherche un stage de fin d'études à partir d'avril 2026. 
+J'ai découvert cette offre sur le site de recrutement d'Inria. 
+
+Durant cette année, j'ai choisi de prendre un penchant particulier pour les cours théoriques en apprentissage automatique et en optimisation mathématique, dans le but de me préparer au mieux pour un futur doctorat dans ces domaines. 
+
+Mon précédent stage de recherche à l'ENSTA Paris m'a permis de renforcer ma capacité à mener des travaux en laboratoire. 
+J'y ai découvert une atmosphère qui me correspond pleinement. J'ai pu travailler sur des modèles comportant des données complexes et hétérogènes. De plus à travers mon choix de cours, je pense pouvoir apporter une contribution pertinente sur ce genre de systèmes a grande échelle.
+
+Par ailleurs, mon stage d'ingénierie logicielle chez Rubicon illustre ma capacité à travailler de manière autonome. 
+
+Ces expériences, couplées à mon objectif à long terme de poursuivre un doctorat en machine learning, nourrissent ma volonté de contribuer au développement de modèles génératifs pour la prévision atmosphérique. Les aspects multiéchelles et spectraux mis en avant dans la description du stage m'intéressent particulièrement, ainsi que l'étude du lien entre architecture du modèle, fidélité physique et stabilité numérique. 
+Vous trouverez un résumé détaillé de mes compétences et expériences dans le CV ci-joint.
+
+Je serais très heureux de pouvoir échanger plus en détail à propos de ma candidature et de la manière dont je pourrais contribuer aux travaux de l'équipe ARCHES. 
+
+\bigskip % Vertical whitespace
+
+Sincèrement,
+
+\includegraphics[height = 1cm]{../signature_bw.jpg}
+
+\vspace{25pt}
+
+Augustin Bresset
+\end{document}

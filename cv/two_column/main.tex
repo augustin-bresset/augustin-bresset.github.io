@@ -1,0 +1,177 @@
+\documentclass[10pt,a4paper,withhyper]{altacv}
+
+\geometry{left=1.25cm,right=1.25cm,top=1.5cm,bottom=1.5cm,columnsep=1.2cm}
+\usepackage{paracol}
+
+\iftutex
+  \setmainfont{Roboto Slab}
+  \setsansfont{Lato}
+  \renewcommand{\familydefault}{\sfdefault}
+\else
+  \usepackage[rm]{roboto}
+  \usepackage[defaultsans]{lato}
+  \renewcommand{\familydefault}{\sfdefault}
+\fi
+
+\definecolor{SlateGrey}{HTML}{2E2E2E}
+\definecolor{LightGrey}{HTML}{666666}
+\definecolor{DarkPastelRed}{HTML}{450808}
+\definecolor{PastelRed}{HTML}{8F0D0D}
+\definecolor{GoldenEarth}{HTML}{E7D192}
+\colorlet{name}{black}
+\colorlet{tagline}{PastelRed}
+\colorlet{heading}{DarkPastelRed}
+\colorlet{headingrule}{GoldenEarth}
+\colorlet{subheading}{PastelRed}
+\colorlet{accent}{PastelRed}
+\colorlet{emphasis}{SlateGrey}
+\colorlet{body}{LightGrey}
+
+\renewcommand{\namefont}{\Huge\rmfamily\bfseries}
+\renewcommand{\personalinfofont}{\footnotesize}
+\renewcommand{\cvsectionfont}{\LARGE\rmfamily\bfseries}
+\renewcommand{\cvsubsectionfont}{\large\bfseries}
+
+\renewcommand{\cvItemMarker}{{\small\textbullet}}
+\renewcommand{\cvRatingMarker}{\faCircle}
+
+\begin{document}
+
+\name{Augustin Bresset}
+\tagline{Master in Data Science at École Polytechnique | Applied Maths \& Statistics at Télécom SudParis}
+
+\personalinfo{%
+  \email{augustin.bresset@polytechnique.edu}
+  \phone{+33 6 51 09 26 88}
+  \location{Paris, France}
+  \homepage{github.com/augustin-bresset}
+  \linkedin{Augustin Bresset}
+  \github{augustin-bresset}
+}
+
+\makecvheader
+\columnratio{0.6}
+\begin{paracol}{2}
+
+% ==== LEFT COLUMN ====
+
+\cvsection{Experience}
+
+\cvevent{Software Engineer Intern}{Rubicon}{May 2025 -- Aug 2025}{Bangkok, Thailand}
+\begin{itemize}
+    \item Migrated all internal management software (ERP) from a proprietary system to \textbf{Odoo 18 Community}.
+    \item Designed and implemented robust database models and automated import scripts for production and pricing systems.
+    \item Contributed to improving scalability, modularity, and reliability of the company's digital tools.
+\end{itemize}
+
+\divider
+
+\cvevent{Research Intern}{ENSTA Paris}{Sept 2024 -- Feb 2025}{Palaiseau, France}
+\begin{itemize}
+    \item Conducted a literature review on \textbf{SLAM using LiDAR and IMU}.
+    \item Processed robotic datasets and explored \textbf{traversability modeling}.
+    \item Worked with \textbf{ROS} and \textbf{PyTorch} for model testing and data fusion.
+\end{itemize}
+
+\divider
+
+\cvevent{Software Intern}{Upfund}{Jun 2023 -- Aug 2023}{Paris, France}
+\begin{itemize}
+    \item Developed web applications using \textbf{Angular CLI} and \textbf{Django}.
+    \item Improved API integration and data visualization for financial technology tools.
+\end{itemize}
+
+\bigskip
+\cvsection{Education}
+
+\cvevent{Master of Science in Data Science}{École Polytechnique}{Sept 2025 -- Sept 2026}{Palaiseau, France}
+\begin{itemize}
+    \item Focused on \textbf{Probability, Statistics, and Optimization} with the goal of pursuing a PhD in data science optimization.
+\end{itemize}
+
+\divider
+
+\cvevent{Master of Engineering in Computer Science}{Télécom SudParis}{2022 -- 2026}{Évry, France}
+\begin{itemize}
+    \item Classes in \textbf{Statistics, Computer Science, Machine Learning, and Data Engineering}.
+\end{itemize}
+
+\divider
+
+\cvevent{Classes Préparatoires (Maths \& Physics, CS option)}{Lycée Saint-Louis}{2021 -- 2022}{Paris, France}
+
+\bigskip
+% \cvsection{Projects}
+
+
+% \cvevent{AutoTech}{Telecom SudParis}{2023}{}
+% \begin{itemize}
+%     \item Built a 1/10 scale autonomous vehicle using ROS, LiDAR, and IMU.
+% \end{itemize}
+
+% \divider
+% \cvevent{Swarm Rescue Challenge}{CIEDS}{2025}{}
+% \begin{itemize}
+%     \item Code competition involving autonomous drones.
+%     \item Developed algorithms for multi-agent coordination and obstacle avoidance.
+% \end{itemize}
+
+\switchcolumn
+
+% ==== RIGHT COLUMN ====
+
+\cvsection{About Me}
+\begin{quote}
+I have always been drawn to research and mathematics, with a strong interest in solving complex computational problems and finding creative, out-of-the-box solutions.\end{quote}
+
+\cvsection{Most Proud Of}
+
+\cvachievement{\faLaptopCode}{Rubicon ERP Migration}{Led a complete ERP transition for a company during my internship.}
+\divider
+\cvachievement{\faLightbulb}{Academic Excellence}{Selected for the \textbf{M2 Data Science} at École Polytechnique.}
+\divider
+\cvachievement{\faRobot}{Autonomous Systems}{Hands-on experience in robotics, data modeling, and optimization.}
+
+\cvsection{Strengths}
+
+\cvtag{Analytical Thinking}
+\cvtag{Curiosity}
+\cvtag{Problem Solving}\\
+\cvtag{Project Management}
+\cvtag{Self-Learning}
+\cvtag{Detail-Oriented}
+
+\divider\smallskip
+
+\cvtag{Python}
+\cvtag{Django}
+\cvtag{Odoo}
+\cvtag{SQL}\\
+\cvtag{PyTorch}
+\cvtag{Data Engineering}
+\cvtag{Optimization}
+
+\cvsection{Languages}
+
+\cvskill{French}{5}
+\divider
+\cvskill{English}{5}
+
+\cvsection{Technical Skills}
+
+\cvskill{Python / Odoo / Django}{5}
+\cvskill{Pytorch, TensorFlow}{4.5}
+\cvskill{C++ / Bash / Github / SQL}{4}
+\cvskill{Web (Angular, HTML, CSS)}{3.5}
+
+\cvsection{Interests}
+
+\cvtag{Piano}
+\cvtag{Movies}
+\cvtag{Literature}
+\cvtag{Climbing}
+\cvtag{Hiking}
+
+
+\end{paracol}
+\end{document}
