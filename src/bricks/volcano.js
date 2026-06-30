@@ -1,14 +1,53 @@
-// volcano.js (brick) — RARE dramatic feature placed on the island's highest peak.
-// Scorched cone + glowing crater (pulsing emissive) + rising smoke puffs + an
-// ember light that flickers.
+// volcano.js (brick) — a lone dramatic cone rising from FLAT barren ground (world.js
+// flattens a pad for it; it is never perched on a peak). Scorched cone + glowing
+// crater (pulsing emissive) + rising smoke puffs + a flickering ember light.
+// `scale` makes it variable-sized per world.
 import * as THREE from 'three';
 
-export function buildVolcano(peak) {
+export function buildVolcano(pos, scale = 1) {
   const group = new THREE.Group();
   group.name = 'volcano';
-  group.position.set(peak.x, peak.y - 8, peak.z);
+  // base sits just into the (flattened) ground, scaled so big volcanoes don't float
+  group.position.set(pos.x, pos.y - 2.5 * scale, pos.z);
 
-  const H = 30, rBase = 26, rTop = 7;
+  const H = 30 * scale, rBase = 26 * scale, rTop = 7 * scale;
+
+  // --- dark scorched apron (cailloux sombres) around the base ---------------
+  // A field of dark basalt gravel + scattered boulders so the cone always sits in a
+  // ring of dark volcanic rock, whatever biome it landed in. groundY is the flattened
+  // pad surface in local space (group is sunk 2.5*scale below it).
+  const groundY = 2.5 * scale;
+  const apronR = (pos.padR ? pos.padR : rBase * 1.8) * 0.94;
+  const gGeo = new THREE.CircleGeometry(apronR, 30);
+  gGeo.rotateX(-Math.PI / 2);
+  // rough up the gravel disc a touch so it isn't a clean circle
+  const gp = gGeo.attributes.position;
+  for (let i = 0; i < gp.count; i++) {
+    const x = gp.getX(i), z = gp.getZ(i);
+    if (x || z) gp.setY(i, (Math.sin(x * 0.7) + Math.cos(z * 0.6)) * 0.6);
+  }
+  gGeo.computeVertexNormals();
+  const gravel = new THREE.Mesh(
+    gGeo, new THREE.MeshStandardMaterial({ color: 0x33302b, roughness: 1, flatShading: true })
+  );
+  gravel.position.y = groundY + 0.12;
+  gravel.receiveShadow = true;
+  group.add(gravel);
+
+  const rockGeo = new THREE.DodecahedronGeometry(1, 0); rockGeo.scale(1, 0.75, 1.05);
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x2b2723, roughness: 1, flatShading: true });
+  for (let i = 0; i < 70; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const t = Math.random();
+    const rr = rBase * 1.04 + t * (apronR - rBase * 1.04);
+    const sc = (0.7 + Math.random() * 2.6) * scale * (1 - t * 0.45);
+    const m = new THREE.Mesh(rockGeo, rockMat);
+    m.position.set(Math.cos(a) * rr, groundY + sc * 0.28, Math.sin(a) * rr);
+    m.rotation.set(Math.random() * 0.6, Math.random() * 6.28, Math.random() * 0.6);
+    m.scale.setScalar(sc);
+    m.castShadow = true; m.receiveShadow = true;
+    group.add(m);
+  }
 
   // cone body (scorched rock)
   const coneGeo = new THREE.CylinderGeometry(rTop, rBase, H, 9, 1, true);

@@ -11,15 +11,26 @@ export class CameraRig {
     );
 
     // Spherical-ish orbit around a movable target on the ground plane.
-    this.target = new THREE.Vector3(0, 18, 0);
+    // IMMERSIVE framing: we sit *inside* the continent so the land fills the frame
+    // and runs off into the horizon mist — never far enough out to see the map's
+    // finite edge (that's why there's a clickable legend to reach the settlements).
+    this.target = new THREE.Vector3(0, 16, 0);
     this.azimuth = Math.PI * 0.25;     // rotation around Y
-    this.polar = THREE.MathUtils.degToRad(46); // from vertical: oblique 3/4 view
-    this.radius = worldRadius * 2.3;           // far enough to see the whole continent
+    // HORIZON VISTA: look OUT at the world (not straight down) so the big generated
+    // terrain runs off to a hazy horizon with natural mountains on the skyline,
+    // instead of ending at a chunked edge. A pure top-down diorama can't frame a
+    // horizon at all (the skyline sits above the top of frame).
+    this.polar = THREE.MathUtils.degToRad(70); // oblique, tilted toward the horizon
+    this.radius = worldRadius * 0.95;          // immersed, not a far overview
 
     this.minRadius = 70;
-    this.maxRadius = worldRadius * 2.9;
-    this.minPolar = THREE.MathUtils.degToRad(24);
-    this.maxPolar = THREE.MathUtils.degToRad(58);
+    // The terrain grid is far larger than this reference radius and its square edge
+    // sits well past the fog wall, so the camera stays IMMERSED and central: cap the
+    // zoom-out and clamp the pan target to a tight disc (see _clampTarget) — you can
+    // roam to every settlement but never out toward where the edge would be.
+    this.maxRadius = worldRadius * 1.02;
+    this.minPolar = THREE.MathUtils.degToRad(45);
+    this.maxPolar = THREE.MathUtils.degToRad(74);
 
     this.idleDrift = true;       // slow auto-rotation when not interacting
     this.idleSpeed = 0.012;      // rad/sec
@@ -139,11 +150,17 @@ export class CameraRig {
   }
 
   _clampTarget() {
-    // roam most of the big continent (half-extent 500) but stop before drifting
-    // out over empty open sea
-    const R = 340;
-    this.target.x = THREE.MathUtils.clamp(this.target.x, -R, R);
-    this.target.z = THREE.MathUtils.clamp(this.target.z, -R, R);
+    // Keep the panned target inside a tight CENTRAL disc so you can never slide the
+    // view out toward the big terrain's far edge (which fog already hides). All cities
+    // are placed inside this same disc (see cities/placement.js) so every settlement
+    // is reachable by panning.
+    const R = 300;
+    const d = Math.hypot(this.target.x, this.target.z);
+    if (d > R) {
+      const s = R / d;
+      this.target.x *= s;
+      this.target.z *= s;
+    }
   }
 
   // Programmatic move (used by navigation dive). Returns nothing; smoothing eases to it.

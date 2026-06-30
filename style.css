@@ -141,156 +141,226 @@ html, body {
   white-space: nowrap;
 }
 
-/* ── Content Panel ────────────────────────────────────────── */
-.content-panel {
+/* ── Settlement legend (clickable list, overview only) ────────── */
+.legend {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(580px, 90vw);
-  max-height: 82vh;
-  overflow-y: auto;
-  background: var(--parchment);
-  border: 2px solid var(--ink);
-  padding: 2.5rem 2.8rem;
-  z-index: 200;
-  box-shadow: 7px 7px 0 rgba(44, 26, 14, 0.14);
-  transition: opacity 0.25s;
+  top: 4.6rem;
+  left: 1.8rem;
+  z-index: 80;
+  background: rgba(237, 228, 210, 0.9);
+  border: 1.5px solid rgba(44, 26, 14, 0.28);
+  backdrop-filter: blur(6px);
+  padding: 0.7rem 0.7rem 0.55rem;
+  width: 188px;
+  box-shadow: 4px 5px 0 rgba(44, 26, 14, 0.12);
+  transition: opacity 0.4s, transform 0.4s;
 }
-
-/* L-corner decorations */
-.content-panel::before {
-  content: '';
-  position: absolute;
-  top: -5px;
-  left: -5px;
-  width: 18px;
-  height: 18px;
-  border-top: 3px solid var(--ink);
-  border-left: 3px solid var(--ink);
+.legend.hidden {
+  opacity: 0;
+  transform: translateX(-12px);
+  pointer-events: none;
 }
-
-.content-panel::after {
-  content: '';
-  position: absolute;
-  bottom: -5px;
-  right: -5px;
-  width: 18px;
-  height: 18px;
-  border-bottom: 3px solid var(--ink);
-  border-right: 3px solid var(--ink);
+.legend-title {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  padding: 0 0.35rem 0.5rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid rgba(44, 26, 14, 0.14);
 }
-
-.content-panel.hidden {
-  display: none;
-}
-
-.panel-close {
-  position: absolute;
-  top: 0.9rem;
-  right: 1.1rem;
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
   background: none;
   border: none;
-  font-size: 1rem;
+  padding: 0.4rem 0.35rem;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.legend-item:hover { background: rgba(44, 26, 14, 0.08); }
+.legend-dot {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(44, 26, 14, 0.4);
+  box-shadow: 0 0 7px currentColor;
+}
+.legend-text { display: flex; flex-direction: column; line-height: 1.1; }
+.legend-name {
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: 1.18rem;
+  color: var(--ink);
+}
+.legend-sub {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.7rem;
+  color: var(--ink-light);
+}
+
+/* ── Field note (a slip pinned beside a landmark) ─────────────── */
+.note-card {
+  --accent: var(--rust);
+  position: fixed;
+  left: 0; top: 0;
+  width: min(332px, calc(100vw - 28px));
+  background:
+    linear-gradient(170deg, rgba(255, 253, 246, 0.7), rgba(237, 228, 210, 0) 130px),
+    var(--parchment);
+  border: 2px solid var(--ink);
+  border-left: 6px solid var(--accent);
+  padding: 1.2rem 1.45rem 1.3rem;
+  z-index: 200;
+  box-shadow: 6px 8px 0 rgba(44, 26, 14, 0.16);
+  will-change: transform, opacity;
+}
+
+.note-card.hidden { display: none; }
+
+/* a small accent "gem" notch on the edge that faces the marker */
+.note-card::after {
+  content: '';
+  position: absolute;
+  top: var(--notch-y, 42px);
+  width: 13px; height: 13px;
+  background: var(--accent);
+  border: 2px solid var(--ink);
+  transform: translateY(-50%) rotate(45deg);
+}
+.note-card--right::after { left: -8px; }
+.note-card--left::after  { right: -8px; }
+/* keep the thick accent edge on the side that faces the marker */
+.note-card--left { border-left-width: 2px; border-right: 6px solid var(--accent); }
+
+.note-close {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.7rem;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
   cursor: pointer;
   color: var(--ink-light);
   font-family: 'EB Garamond', serif;
   line-height: 1;
-  padding: 0.2rem 0.4rem;
+  padding: 0.2rem 0.35rem;
   transition: color 0.15s;
 }
+.note-close:hover { color: var(--ink); }
 
-.panel-close:hover {
-  color: var(--ink);
-}
-
-/* Panel body typography */
-#panel-body h2 {
-  font-family: 'Caveat', cursive;
-  font-size: 2.2rem;
-  font-weight: 700;
-  color: var(--ink);
-  margin-bottom: 0.3rem;
-  line-height: 1.1;
-}
-
-#panel-body .panel-tag {
+/* note body typography */
+.note-kicker {
   display: block;
   font-family: 'EB Garamond', serif;
   font-style: italic;
-  font-size: 0.85rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--ink-light);
-  letter-spacing: 0.04em;
-  margin-bottom: 1.2rem;
-  padding-bottom: 0.9rem;
-  border-bottom: 1px solid rgba(44, 26, 14, 0.12);
+  margin-bottom: 0.15rem;
 }
 
-#panel-body p {
-  font-size: 1rem;
-  line-height: 1.8;
+.note-title {
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: 1.7rem;
+  line-height: 1.05;
+  color: var(--ink);
+  margin: 0 0 0.5rem;
+  padding-right: 1rem;
+}
+
+.note-text {
+  font-size: 0.92rem;
+  line-height: 1.62;
   color: var(--ink-mid);
-  margin-bottom: 1rem;
+  margin: 0;
 }
 
-#panel-body .spec-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.8rem 0 1.2rem;
+.note-meta {
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(44, 26, 14, 0.14);
 }
-
-#panel-body .spec-table td {
-  padding: 0.45rem 0;
-  font-size: 0.9rem;
-  vertical-align: top;
-  line-height: 1.5;
-}
-
-#panel-body .spec-table td:first-child {
-  font-weight: 600;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+.note-meta-row + .note-meta-row { margin-top: 0.55rem; }
+.note-meta-k {
+  display: block;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink);
-  width: 115px;
-  font-style: italic;
-  padding-right: 0.8rem;
 }
-
-#panel-body .spec-table td:last-child {
+.note-meta-v {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.45;
   color: var(--ink-mid);
 }
 
-#panel-body .spec-table tr {
-  border-bottom: 1px solid rgba(44, 26, 14, 0.08);
-}
-
-.panel-links {
+.note-links {
   display: flex;
-  gap: 1.2rem;
-  margin-top: 1.4rem;
+  gap: 1rem;
+  margin-top: 1rem;
   flex-wrap: wrap;
 }
-
-.panel-link {
+.note-link {
   font-family: 'Caveat', cursive;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   color: var(--ink);
   text-decoration: none;
-  border-bottom: 1.5px solid var(--rust);
+  border-bottom: 1.5px solid var(--accent);
   padding-bottom: 1px;
   transition: color 0.2s;
 }
+.note-link:hover { color: var(--accent); }
 
-.panel-link:hover {
-  color: var(--rust);
+/* entrance: the slip drops in, its lines rise in a quick stagger */
+@keyframes noteDrop {
+  from { opacity: 0; transform: translateY(10px) scale(0.96) rotate(-1.2deg); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes noteRise {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: none; }
+}
+.note-card.note-in { animation: noteDrop 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+.note-card.note-in .note-kicker { animation: noteRise 0.4s both 0.05s; }
+.note-card.note-in .note-title  { animation: noteRise 0.4s both 0.11s; }
+.note-card.note-in .note-text   { animation: noteRise 0.4s both 0.17s; }
+.note-card.note-in .note-meta   { animation: noteRise 0.4s both 0.23s; }
+.note-card.note-in .note-links  { animation: noteRise 0.4s both 0.27s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .note-card.note-in,
+  .note-card.note-in * { animation: none !important; }
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 600px) {
-  .content-panel {
-    padding: 1.8rem 1.5rem;
+  /* the slip becomes a bottom sheet; JS positioning is overridden */
+  .note-card {
+    left: 0 !important;
+    right: 0;
+    top: auto !important;
+    bottom: 0;
+    width: 100%;
+    border-left-width: 2px;
+    border-bottom: none;
+    border-top: 4px solid var(--accent);
+    box-shadow: 0 -6px 18px rgba(44, 26, 14, 0.18);
   }
+  .note-card::after { display: none; }
 
   #ui {
     padding: 1rem 1.2rem;
@@ -299,7 +369,18 @@ html, body {
   .ui-hint {
     font-size: 0.8rem;
     bottom: 1.2rem;
+    max-width: 90vw;
+    white-space: normal;
+    text-align: center;
   }
+
+  .legend {
+    top: 4rem;
+    left: 0.8rem;
+    width: 150px;
+    padding: 0.5rem 0.5rem 0.4rem;
+  }
+  .legend-name { font-size: 1.05rem; }
 }
 
 /* ── WebGL fallback ───────────────────────────────────────── */

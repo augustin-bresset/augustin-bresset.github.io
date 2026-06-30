@@ -1,12 +1,11 @@
 // script.js — entry point. Boots the stage, builds the procedural world,
 // wires the camera rig, UI and navigation, then runs the render loop.
-import * as THREE from 'three';
 import { createStage } from './src/stage.js';
 import { CameraRig } from './src/camera.js';
 import { buildWorld, WORLD } from './src/world.js';
 import { UI } from './src/ui.js';
 import { Navigation } from './src/navigation.js';
-import { LANG } from './src/lang.js';
+import { LANG, cityLabel } from './src/lang.js';
 import { createOutline } from './src/postfx.js';
 
 const container = document.getElementById('viewport');
@@ -47,11 +46,18 @@ function boot() {
 
   const rig = new CameraRig(container, WORLD.half);
   if (reduceMotion) rig.idleDrift = false;
+  // open the home view toward the generated mountain mass (computed in world.js) so
+  // there are always real mountains on the horizon ahead.
+  if (world.scenicAzimuth != null) {
+    rig.azimuth = rig._azim = rig.home.azimuth = world.scenicAzimuth;
+    rig.apply();
+  }
   stage.setCamera(rig.camera);
 
   const ui = new UI();
   const nav = new Navigation(stage, rig, world, ui);
-  document.getElementById('panel-close').addEventListener('click', () => nav.back());
+  document.getElementById('note-close').addEventListener('click', () => nav.closeNote());
+  ui.buildLegend(world.cities, (id) => nav.diveTo(id));
 
   // experimental ink outline — opt-in (?outline=1). The painterly grain+vignette
   // overlay is the default look; depth-outline gets busy in dense foliage.
@@ -72,23 +78,22 @@ function boot() {
   stage.onFrame((t, dt) => {
     rig.update(t, dt);
     for (const u of world.updaters) u(t, dt);
+    nav.tick();                       // keep an open field-note pinned to its marker
   });
 
   stage.start();
 
-  // deep-link straight into a project, e.g. ?focus=toaster
+  // deep-link straight into a project, e.g. ?focus=toaster (optionally &poi=ensta)
+  const poi = qp.get('poi');
+  if (poi) nav.pendingPoi = poi;
   const f = qp.get('focus');
   if (f) setTimeout(() => nav.diveTo(f), 600);
   const sn = qp.get('snap');
-  if (sn && nav.snapTo) {
-    nav.snapTo(sn);
-    // ?panel=0 frames the settlement without opening its panel (clean look / debug)
-    if (qp.get('panel') === '0') ui.hidePanel();
-  }
+  if (sn && nav.snapTo) nav.snapTo(sn);
 }
 
 function applyCityLabels(world) {
   for (const c of world.cities) {
-    if (c.label && c.labelKey) c.label.setText(LANG.t(c.labelKey), LANG.t(c.subKey));
+    if (c.label) c.label.setText(...cityLabel(c.id, LANG.current));
   }
 }

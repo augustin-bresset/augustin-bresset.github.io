@@ -1,0 +1,10 @@
+{
+  "name": "augustin-bresset-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Procedural 3D world-map portfolio (Three.js, no build step). package.json exists only so node can run the gen/ invariant tests as ES modules — GitHub Pages serves the static files directly and ignores it.",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-loader ./test/three-loader.mjs test/invariants.mjs"
+  }
+}

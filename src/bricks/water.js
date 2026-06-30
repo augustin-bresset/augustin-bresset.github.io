@@ -6,8 +6,9 @@ import * as THREE from 'three';
 import { WATER_Y } from '../gen/heightmap.js';
 
 export function buildSea(worldSize) {
-  const span = worldSize * 3.2;             // extend well past the island into fog
-  const seg = Math.round(span / 7);         // ~7-unit facets
+  // reach the horizon/fog, but don't tie the plane to the full (huge) terrain grid
+  const span = Math.min(worldSize * 3.2, 4200); // extend past the land into the fog
+  const seg = Math.min(360, Math.round(span / 12)); // capped facet count (perf)
   const geo = new THREE.PlaneGeometry(span, span, seg, seg);
   geo.rotateX(-Math.PI / 2);
 

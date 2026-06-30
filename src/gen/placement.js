@@ -28,6 +28,10 @@ export function planScatter(field, slope, hydro, seed, exclusions = []) {
     return false;
   };
 
+  // Only scatter within the visible radius — the generated grid runs far past the
+  // fog wall, and trees/rocks out there are never seen (but would cost plenty).
+  const SCATTER_R = 1300, SCATTER_R2 = SCATTER_R * SCATTER_R;
+
   for (let j = 1; j < N; j++) {
     for (let i = 1; i < N; i++) {
       const k = idx(i, j);
@@ -36,6 +40,8 @@ export function planScatter(field, slope, hydro, seed, exclusions = []) {
       const y = heights[k];
       const sl = slope[k];
       if (y < 1.6 || sl > 0.62) continue;
+      const cx = gx(i), cz = gz(j);
+      if (cx * cx + cz * cz > SCATTER_R2) continue;
 
       const prof = scatterProfile(b);
       const wx = gx(i) + (rand() - 0.5) * 2.4;

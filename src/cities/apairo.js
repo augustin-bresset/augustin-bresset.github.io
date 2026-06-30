@@ -4,7 +4,7 @@
 // sorting robot arm, a solar array, and a little pier + parasol on the beach.
 // Light & well-modelled to contrast the dark cyberpunk labs. Portal returns home.
 import * as THREE from 'three';
-import { box, cyl, platform, glow, makeLabel, makePortal, tagPickable, sprawl } from './kit.js';
+import { box, cyl, platform, glow, makeLabel, makePortal, poiBeacon, tagPOI, tagPickable, sprawl } from './kit.js';
 
 const WHITE = 0xf1ece0, STEEL = 0x8b97a3, GREY = 0xccc7bb, GLASS = 0xbfe3e8;
 const AMBER = 0xdda42a, TRIM = 0x39434f, SAND = 0xdcc89a, SOLAR = 0x232f49, SEA = 0x5fa0b4;
@@ -20,7 +20,7 @@ export function build() {
 
   // ===== beach + sea apron (the apéro side) on +x, hugging the platform edge =====
   const sand = box(24, 0.4, 30, SAND, { pos: [25, 0.05, 2], receive: true, cast: false });
-  g.add(sand);
+  g.add(sand); tagPOI(sand, 'pier');
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(26, 36),
     new THREE.MeshStandardMaterial({ color: SEA, transparent: true, opacity: 0.82, roughness: 0.25, metalness: 0.1 }));
   sea.rotation.x = -Math.PI / 2; sea.position.set(39, -0.35, 2); g.add(sea);
@@ -31,13 +31,13 @@ export function build() {
   }
   // apéro parasol + table + stools on the sand
   g.add(cyl(0.12, 0.12, 3, 0x9a8468, 6, { pos: [19, 1.5, -8] }));
-  const para = cyl(0.1, 3.2, 1.4, 0xcf6b4a, 10, { pos: [19, 3.2, -8] }); para.castShadow = true; g.add(para);
+  const para = cyl(0.1, 3.2, 1.4, 0xcf6b4a, 10, { pos: [19, 3.2, -8] }); para.castShadow = true; g.add(para); tagPOI(para, 'pier');
   g.add(cyl(1.3, 1.3, 0.2, WHITE, 12, { pos: [19, 1.0, -8] }));     // table top
   for (const [dx, dz] of [[1.5, 0], [-1.5, 0]]) g.add(box(0.5, 0.9, 0.5, AMBER, { pos: [19 + dx, 0.45, -8 + dz], cast: false })); // stools
 
   // ===== main factory hall with a sawtooth (north-light) roof =====
   const hall = box(17, 7, 12, WHITE, { pos: [-4, 3.5, -1], roughness: 0.7 });
-  g.add(hall);
+  g.add(hall); tagPOI(hall, 'hall');
   // steel base trim + corner columns
   g.add(box(17.4, 0.8, 12.4, STEEL, { pos: [-4, 0.4, -1] }));
   for (const [x, z] of [[4.3, 5.8], [-12.3, 5.8], [4.3, -7.8], [-12.3, -7.8]])
@@ -58,25 +58,27 @@ export function build() {
   }
 
   // ===== steel silos (dataset storage) =====
+  const siloGroup = new THREE.Group(); g.add(siloGroup); tagPOI(siloGroup, 'silos');
   for (const [x, z, r, h] of [[-14, 0, 2.2, 9], [-14, 5, 1.8, 7.5], [-10.5, 7.5, 1.5, 6]]) {
-    g.add(cyl(r, r, h, STEEL, 16, { pos: [x, h / 2, z], roughness: 0.5, metalness: 0.4 }));
-    g.add(cyl(r, r * 0.2, r * 0.8, 0xb9c2cb, 16, { pos: [x, h + r * 0.35, z] })); // dome cap
-    g.add(box(r * 2, 0.3, 0.4, AMBER, { pos: [x, h * 0.6, z + r + 0.05], emissive: AMBER, emissiveIntensity: 0.5, cast: false })); // gauge band
+    siloGroup.add(cyl(r, r, h, STEEL, 16, { pos: [x, h / 2, z], roughness: 0.5, metalness: 0.4 }));
+    siloGroup.add(cyl(r, r * 0.2, r * 0.8, 0xb9c2cb, 16, { pos: [x, h + r * 0.35, z] })); // dome cap
+    siloGroup.add(box(r * 2, 0.3, 0.4, AMBER, { pos: [x, h * 0.6, z + r + 0.05], emissive: AMBER, emissiveIntensity: 0.5, cast: false })); // gauge band
   }
 
   // ===== conveyor carrying data crates into the hall, with a sorting robot arm =====
   const beltY = 2.2;
-  g.add(box(14, 0.4, 2.0, TRIM, { pos: [9, beltY, 6], roughness: 0.6 }));   // belt deck
+  const belt = box(14, 0.4, 2.0, TRIM, { pos: [9, beltY, 6], roughness: 0.6 });   // belt deck
+  g.add(belt); tagPOI(belt, 'conveyor');
   for (let i = 0; i < 7; i++) g.add(cyl(0.16, 0.16, beltY, STEEL, 6, { pos: [3.5 + i * 2, beltY / 2, 6] })); // legs
   const crates = [];
   const crateCol = [0xdda42a, 0x4a90d9, 0x57a957, 0xcf6b4a];
   for (let i = 0; i < 6; i++) {
     const c = box(1.1, 1.1, 1.1, crateCol[i % 4], { pos: [2 + i * 2.4, beltY + 0.75, 6], roughness: 0.7 });
-    g.add(c); crates.push(c);
+    g.add(c); crates.push(c); tagPOI(c, 'conveyor');
   }
   // sorting robot arm beside the belt
   const armBase = cyl(0.9, 1.1, 0.7, STEEL, 12, { pos: [3, 0.6, 9] }); g.add(armBase);
-  const seg1 = new THREE.Group(); seg1.position.set(3, 1.1, 9); g.add(seg1);
+  const seg1 = new THREE.Group(); seg1.position.set(3, 1.1, 9); g.add(seg1); tagPOI(seg1, 'conveyor');
   seg1.add(box(0.6, 4, 0.6, TRIM, { pos: [0, 2, 0] }));
   const seg2 = new THREE.Group(); seg2.position.set(0, 4, 0); seg1.add(seg2);
   seg2.add(box(0.5, 3, 0.5, TRIM, { pos: [0, 1.5, 0] }));
@@ -112,6 +114,17 @@ export function build() {
     const a = (i / 8) * Math.PI * 2; tooth.position.set(Math.cos(a) * 1.5, Math.sin(a) * 1.5, 0); gear.add(tooth);
   }
 
+  // ===== floating markers over the four readable landmarks =====
+  const pois = [];
+  const addBeacon = (id, accent, x, y, z) => {
+    const b = poiBeacon(accent); b.group.position.set(x, y, z); g.add(b.group);
+    tagPOI(b.group, id); pois.push({ id, accent, beacon: b });
+  };
+  addBeacon('hall', '#dda42a', -4, 12, -1);
+  addBeacon('silos', '#8b97a3', -14, 13, 2);
+  addBeacon('conveyor', '#4a90d9', 9, 7, 6);
+  addBeacon('pier', '#cf6b4a', 19, 8, -8);
+
   // ===== portal back to the map =====
   const portal = makePortal('#dda42a');
   portal.group.position.set(13, 0, -12); g.add(portal.group);
@@ -123,8 +136,10 @@ export function build() {
 
   return {
     group: g, label,
+    pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
     update(t, dt) {
       portal.update(t);
+      for (const p of pois) p.beacon.update(t);
       gear.rotation.z = t * 0.8;
       // conveyor crates march toward the hall, recycle at the end
       for (const c of crates) {

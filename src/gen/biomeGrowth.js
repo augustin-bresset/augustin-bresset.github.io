@@ -83,12 +83,23 @@ export function growBiomes(graph, seed) {
     z: (ocy / (rows - 1)) * 2 - 1,
   };
 
-  // --- 2. VOLCANIC hotspot: one random inland site ---
+  // --- 2. VOLCANIC hotspot: one inland site near the CENTRE (so the lone volcano,
+  // when it spawns, sits in the reachable heart of the map) grown to a SMALL blob so
+  // the dark scorched "cailloux" biome stays a single contained patch around the cone
+  // instead of sprawling burnt splotches across the whole continent. ---
+  const ccx = (cols - 1) / 2, ccy = (rows - 1) / 2;
   const inland = sites.filter((s) => s.biome === -1 &&
     s.c > 2 && s.r > 2 && s.c < cols - 3 && s.r < rows - 3);
-  if (inland.length) {
-    const hs = inland[(rand() * inland.length) | 0];
-    assign(hs, BIOME.VOLCANIC);
+  const nearCentre = inland.filter((s) => {
+    const d = Math.hypot(s.c - ccx, s.r - ccy);
+    return d >= 3.5 && d <= 9;   // central, but off dead-centre (room for cities)
+  });
+  const pool = nearCentre.length ? nearCentre : inland;
+  if (pool.length) {
+    const hs = pool[(rand() * pool.length) | 0];
+    for (const s of sites) {
+      if (s.biome === -1 && Math.hypot(s.c - hs.c, s.r - hs.r) < 1.7) assign(s, BIOME.VOLCANIC);
+    }
   }
 
   // --- 3. a few random land seeds to start regions ---
@@ -99,8 +110,9 @@ export function growBiomes(graph, seed) {
   }
 
   // --- 4. grow: repeatedly assign frontier cells from neighbour adjacency ---
-  // candidate biomes = all land biomes (ocean/volcanic only via seeds + their spread)
-  const CANDIDATES = BIOMES.map((b) => b.id);
+  // VOLCANIC is excluded so it never sprawls past its seeded blob (its dry desert/
+  // savanna neighbours grow around it instead); ocean still spreads from the bay.
+  const CANDIDATES = BIOMES.map((b) => b.id).filter((id) => id !== BIOME.VOLCANIC);
   let remaining = sites.filter((s) => s.biome === -1).length;
   let guard = sites.length * 4;
 

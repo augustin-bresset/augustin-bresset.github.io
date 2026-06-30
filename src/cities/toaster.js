@@ -5,7 +5,7 @@
 // bounding boxes and a sweeping scan plane. Identity nod: a brutalist red-slot
 // landmark. A mini-map portal returns you to the overview.
 import * as THREE from 'three';
-import { box, cyl, platform, glow, strip, wireBox, pointCloud, makeLabel, makePortal, tagPickable, sprawl } from './kit.js';
+import { box, cyl, platform, glow, strip, wireBox, pointCloud, makeLabel, makePortal, poiBeacon, tagPOI, tagPickable, sprawl } from './kit.js';
 
 export function build() {
   const g = new THREE.Group();
@@ -25,10 +25,11 @@ export function build() {
     [-24, 8, 24, C4, MAG], [-6, 24, 20, C2, RED],
   ];
   const towerStrips = [];
+  const towerBodies = [];
   for (const [x, z, h, col, neon] of towerSpecs) {
     const tw = box(5, h, 5, col, { pos: [x, h / 2, z], roughness: 0.5, metalness: 0.3 });
     tw.rotation.y = (x * z) % 1.4;
-    g.add(tw);
+    g.add(tw); towerBodies.push(tw);
     // vertical neon edge tubes
     for (const [ex, ez] of [[2.55, 2.55], [-2.55, 2.55], [2.55, -2.55], [-2.55, -2.55]]) {
       const e = box(0.16, h, 0.16, neon, { emissive: neon, emissiveIntensity: 1.8, cast: false });
@@ -41,7 +42,7 @@ export function build() {
   }
 
   // ===== HERO: the holographic 3D-annotation stage (the real Toaster tool) =====
-  const hero = new THREE.Group(); g.add(hero);
+  const hero = new THREE.Group(); g.add(hero); tagPOI(hero, 'stage');
   // dark console base + emitter rim
   hero.add(box(17, 1.4, 13, C4, { pos: [0, 0.7, 0], roughness: 0.4, metalness: 0.5 }));
   const rim = new THREE.Mesh(new THREE.TorusGeometry(8.6, 0.18, 6, 48),
@@ -74,7 +75,8 @@ export function build() {
 
   // ===== identity landmark: brutalist tower with two red "toaster" slots =====
   const land = box(7, 16, 7, C3, { pos: [-13, 8, -8], roughness: 0.5, metalness: 0.2 });
-  g.add(land);
+  g.add(land); tagPOI(land, 'landmark');
+  tagPOI(towerBodies[2], 'clustering');     // the amber skyline tower → clustering note
   const slots = [];
   for (let i = 0; i < 2; i++) {
     const slot = glow(4.4, 0.9, RED, 2.4);
@@ -94,6 +96,16 @@ export function build() {
   billboard.position.set(20, 18, -6); billboard.rotation.y = -0.5;
   billboard.material.transparent = true; billboard.material.opacity = 0.5; g.add(billboard);
 
+  // ===== floating markers over the three readable landmarks =====
+  const pois = [];
+  const addBeacon = (id, accent, x, y, z) => {
+    const b = poiBeacon(accent); b.group.position.set(x, y, z); g.add(b.group);
+    tagPOI(b.group, id); pois.push({ id, accent, beacon: b });
+  };
+  addBeacon('stage', '#33d6ff', 0, 12, 0);
+  addBeacon('landmark', '#e10600', -13, 20, -8);
+  addBeacon('clustering', '#ff8a3c', 22, 26, 22);
+
   // ===== portal back to the map =====
   const portal = makePortal('#e10600');
   portal.group.position.set(14, 0, 12); g.add(portal.group);
@@ -105,8 +117,10 @@ export function build() {
 
   return {
     group: g, label,
+    pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
     update(t, dt) {
       portal.update(t);
+      for (const p of pois) p.beacon.update(t);
       // the cloud breathes; boxes pulse; scan sweeps
       cloud.position.y = Math.sin(t * 0.8) * 0.25;
       cloud.rotation.y = Math.sin(t * 0.2) * 0.15;

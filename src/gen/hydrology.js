@@ -6,6 +6,7 @@
 //
 // Also carves ONE big ravine/canyon as a special dramatic feature.
 import { mulberry32 } from './noise.js';
+import { BIOME } from './biomes.js';
 
 const NB = [
   [-1, -1], [0, -1], [1, -1],
@@ -79,7 +80,7 @@ function fillDepressions(field) {
 }
 
 export function carveRivers(field, seed) {
-  const { N, verts, heights, idx, gx, gz } = field;
+  const { N, verts, heights, biome, idx, gx, gz } = field;
   const n = verts * verts;
   const rand = mulberry32((seed ^ 0x5bd1e995) >>> 0);
 
@@ -116,10 +117,40 @@ export function carveRivers(field, seed) {
   }
 
   // --- 3. pick river cells: enough drainage AND above the waterline ---
-  const RIVER_T = N * 0.7;          // drainage threshold (scales with grid)
+  // (a lower threshold lets channels reach further up the slopes, toward the peaks)
+  const RIVER_T = N * 0.42;          // drainage threshold (scales with grid)
   const riverMask = new Uint8Array(n);
   for (let k = 0; k < n; k++) {
     if (accum[k] > RIVER_T && heights[k] > 0.5) riverMask[k] = 1;
+  }
+
+  // explicit MOUNTAIN SPRINGS: a handful of the highest mountain/snow peaks, kept
+  // spread apart. Each births a stream so rivers visibly rise FROM the mountains,
+  // then follow the terrain's steepest descent down to the sea / the map edge.
+  const peakCells = [];
+  for (let k = 0; k < n; k++) {
+    if ((biome[k] === BIOME.MOUNTAIN || biome[k] === BIOME.SNOW) && heights[k] > 28) peakCells.push(k);
+  }
+  peakCells.sort((a, b) => heights[b] - heights[a]);
+  const springs = [];
+  const MINSEP = N * 0.13;
+  for (const k of peakCells) {
+    // Walk DOWN the steepest-descent flank so the source sits well below the summit —
+    // otherwise a stream appears to spring from the sky-high peak tip. Stop once we've
+    // dropped a good way below the crest (or after a few cells).
+    let sc = k; const peakH = heights[k];
+    const drop = Math.min(26, peakH * 0.35);
+    let steps = 0;
+    while (receiver[sc] >= 0 && heights[sc] > peakH - drop && steps < 14) {
+      sc = receiver[sc]; steps++;
+    }
+    const si = sc % verts, sj = (sc / verts) | 0;
+    let ok = true;
+    for (const s of springs) {
+      if (Math.hypot(si - (s % verts), sj - ((s / verts) | 0)) < MINSEP) { ok = false; break; }
+    }
+    if (ok) springs.push(sc);
+    if (springs.length >= 7) break;
   }
 
   // --- 4. trace continuous polylines from river "sources" to the sea ---
@@ -142,8 +173,10 @@ export function carveRivers(field, seed) {
     }
   }
   sources.sort((a, b) => accum[b] - accum[a]);
+  // mountain springs always trace; then the strongest accumulation heads
+  const allSources = [...springs, ...sources.filter((k) => springs.indexOf(k) === -1)];
 
-  for (const start of sources) {
+  for (const start of allSources) {
     let k = start;
     const pts = [];
     let guard = 0;
@@ -153,14 +186,16 @@ export function carveRivers(field, seed) {
       if (heights[k] <= 0.2) break;        // reached the sea
       usedAsPath[k] = 1;
       const r = receiver[k];
-      if (r < 0) break;                     // pit
+      if (r < 0) break;                     // pit / map-edge outlet
       k = r;
     }
-    if (pts.length > 6) rivers.push(pts);
+    if (pts.length > 6) rivers.push({ pts, spring: springs.indexOf(start) !== -1 });
   }
-  // keep only the most significant rivers so the map isn't a spiderweb
-  rivers.sort((a, b) => b.length - a.length);
-  const keep = rivers.slice(0, 5);
+  // keep every mountain spring + the longest remaining rivers, capped so the map
+  // isn't a spiderweb
+  const springRivers = rivers.filter((r) => r.spring);
+  const others = rivers.filter((r) => !r.spring).sort((a, b) => b.pts.length - a.pts.length);
+  const keep = [...springRivers, ...others].slice(0, 8).map((r) => r.pts);
 
   // --- 5. carve channels along kept rivers (valley + bed) ---
   const before = heights.slice();
