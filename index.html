@@ -43,11 +43,14 @@
 
   <div id="hint" class="ui-hint"><span data-key="hint">Click a settlement to explore</span></div>
 
-  <!-- Project / about panel -->
-  <div id="content-panel" class="content-panel hidden" role="dialog" aria-modal="true">
-    <button id="panel-close" class="panel-close" aria-label="Close">✕</button>
-    <div id="panel-body"></div>
-  </div>
+  <!-- Clickable legend of settlements (populated by ui.js) -->
+  <nav id="legend" class="legend" aria-label="Settlements"></nav>
+
+  <!-- Field note: a small parchment slip pinned beside the clicked landmark -->
+  <aside id="note-card" class="note-card hidden" role="dialog" aria-label="Landmark note">
+    <button id="note-close" class="note-close" aria-label="Close">✕</button>
+    <div id="note-body"></div>
+  </aside>
 
   <script type="module" src="script.js"></script>
 </body>

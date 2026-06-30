@@ -4,7 +4,7 @@
 // top-down grid with an ego car, neon vehicle bounding boxes, lane lines and a
 // radial scan sweep, flanked by camera-feed panels. Dark aqua, never pure black.
 import * as THREE from 'three';
-import { box, cyl, platform, glow, wireBox, pointCloud, makeLabel, makePortal, tagPickable, sprawl } from './kit.js';
+import { box, cyl, platform, glow, wireBox, pointCloud, makeLabel, makePortal, poiBeacon, tagPOI, tagPickable, sprawl } from './kit.js';
 
 // a flat top-down grid of glowing lines (the BEV ground)
 function bevGrid(size, step, color) {
@@ -30,10 +30,11 @@ export function build() {
 
   // skyline towers w/ cyan + violet edge light
   const towerStrips = [];
+  const towerBodies = [];
   for (const [x, z, h, neon] of [[-19, -13, 28, CYAN], [17, -18, 24, VIOLET],
     [23, 11, 22, CYAN], [-23, 9, 26, VIOLET], [-4, 23, 20, CYAN]]) {
     const tw = box(5, h, 5, C2, { pos: [x, h / 2, z], roughness: 0.5, metalness: 0.3 });
-    tw.rotation.y = (x + z) % 1.3; g.add(tw);
+    tw.rotation.y = (x + z) % 1.3; g.add(tw); towerBodies.push(tw);
     for (const [ex, ez] of [[2.55, 2.55], [-2.55, 2.55], [2.55, -2.55], [-2.55, -2.55]]) {
       const e = box(0.16, h, 0.16, neon, { emissive: neon, emissiveIntensity: 1.8, cast: false });
       e.position.set(x + ex, h / 2, z + ez); e.rotation.y = tw.rotation.y; g.add(e); towerStrips.push(e);
@@ -41,7 +42,7 @@ export function build() {
   }
 
   // ===== HERO: holographic BEV labeling table =====
-  const hero = new THREE.Group(); g.add(hero);
+  const hero = new THREE.Group(); g.add(hero); tagPOI(hero, 'table');
   hero.add(box(19, 1.4, 19, C3, { pos: [0, 0.7, 0], roughness: 0.4, metalness: 0.5 }));
   // emissive ground + grid lines
   const ground = glow(17, 17, 0x06303a, 0.55);
@@ -91,8 +92,9 @@ export function build() {
   }
 
   // rotating LiDAR scanner on a mast (Splasher signature)
-  const mast = cyl(0.22, 0.3, 7, 0x223038, 8, { pos: [11, 3.5, -3] }); g.add(mast);
-  const scanner = new THREE.Group(); scanner.position.set(11, 7.2, -3); g.add(scanner);
+  const mast = cyl(0.22, 0.3, 7, 0x223038, 8, { pos: [11, 3.5, -3] }); g.add(mast); tagPOI(mast, 'mast');
+  const scanner = new THREE.Group(); scanner.position.set(11, 7.2, -3); g.add(scanner); tagPOI(scanner, 'mast');
+  tagPOI(towerBodies[1], 'towers');     // the violet skyline tower → "built for" note
   scanner.add(cyl(1.4, 1.6, 1.1, C3, 16, {}));
   const beam = glow(13, 1.0, HI, 1.6); beam.position.set(6.5, 0.2, 0); scanner.add(beam);
 
@@ -107,6 +109,16 @@ export function build() {
     ring.rotation.x = -Math.PI / 2; ring.position.set(-12, 0.4, 6); g.add(ring); rings.push({ ring, ph: i / 4 });
   }
 
+  // ===== floating markers over the three readable landmarks =====
+  const pois = [];
+  const addBeacon = (id, accent, x, y, z) => {
+    const b = poiBeacon(accent); b.group.position.set(x, y, z); g.add(b.group);
+    tagPOI(b.group, id); pois.push({ id, accent, beacon: b });
+  };
+  addBeacon('table', '#00d8ff', 0, 13, 0);
+  addBeacon('mast', '#7af0ff', 11, 12, -3);
+  addBeacon('towers', '#8a5cff', 17, 30, -18);
+
   // ===== portal back to the map =====
   const portal = makePortal('#00d8ff');
   portal.group.position.set(15, 0, 13); g.add(portal.group);
@@ -118,8 +130,10 @@ export function build() {
 
   return {
     group: g, label,
+    pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
     update(t, dt) {
       portal.update(t);
+      for (const p of pois) p.beacon.update(t);
       sweepPivot.rotation.y = -t * 1.1;
       scanner.rotation.y = t * 1.2;
       for (const c of cars) c.material.opacity = 0.7 + Math.sin(t * 2.2 + c.position.x) * 0.25;

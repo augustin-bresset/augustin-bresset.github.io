@@ -10,10 +10,14 @@ export function placeCities(field, graph, seed, cities) {
   const byId = Object.fromEntries(cities.map((c) => [c.id, c]));
   const half = field.half;
 
-  // candidate sites: on land, away from the map edge, and NOT on the volcano cone
+  // candidate sites: on land, NOT on the volcano cone, and inside the central
+  // REACHABLE disc (radius 260) so every city can be reached by panning — the
+  // camera target is clamped to a 300-radius disc (see camera.js _clampTarget) while
+  // the terrain's far edge sits well past the fog wall, out of reach.
+  const REACH = 260;
   const cand = graph.sites.filter((s) => {
     if (s.biome === BIOME.OCEAN || s.biome === BIOME.VOLCANIC) return false;
-    if (Math.abs(s.x) > half * 0.86 || Math.abs(s.z) > half * 0.86) return false;
+    if (Math.hypot(s.x, s.z) > REACH) return false;
     return field.heightAt(s.x, s.z) > 4;
   });
   if (!cand.length) return cities.map((c, i) => ({ city: c, x: (i - 1.5) * 120, z: 0 }));

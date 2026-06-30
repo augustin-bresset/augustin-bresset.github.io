@@ -13,25 +13,21 @@ export const CITIES = [
     // Weighted affinity: strongly prefers the shore (beach) over inland plains so
     // it actually settles by the water (see also the coastal bonus in placement.js).
     id: 'apairo', build: buildApairo, radius: 38,
-    panelKey: 'apairo', labelKey: 'apairoLabel', subKey: 'apairoSub',
     affinity: { beach: 1.0, plains: 0.5, savanna: 0.45 },
   },
   {
     // neon forge → barren scrubland, drawn to the lone volcano (see placement.js)
     id: 'toaster', build: buildToaster, radius: 38,
-    panelKey: 'toaster', labelKey: 'toasterLabel', subKey: 'toasterSub',
     affinity: ['plains', 'savanna', 'desert'],
   },
   {
     // BEV / water-sensor lab → wetlands & shoreline
     id: 'splasher', build: buildSplasher, radius: 36,
-    panelKey: 'splasher', labelKey: 'splasherLabel', subKey: 'splasherSub',
     affinity: ['marsh', 'beach', 'plains'],
   },
   {
     // Augustin's wind-city on a climbing cliff → high, breezy ground
     id: 'about', build: buildAbout, radius: 34,
-    panelKey: 'about', labelKey: 'aboutLabel', subKey: 'aboutSub',
     affinity: ['hills', 'mountain', 'forest'],
   },
 ];

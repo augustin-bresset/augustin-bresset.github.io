@@ -38,9 +38,12 @@ export const BIOMES = [
   { id: 9, key: 'marsh',    name: 'Marsh',     color: '#7d8467', height: { base: 1.8, amp: 2.8, ridged: 0, freq: 0.03 }, weight: 0.35, scatter: 'sparse',
     adj: { marsh: 4, plains: 2, forest: 2, ocean: 2, beach: 2 } },
   // Volcano sits ALONE in a barren lowland (desert/savanna/plains), NOT inside a
-  // mountain massif — a lone cone rising out of flat scrubland. Its neighbours are
-  // low + barren so it reads as isolated; Toaster's forge can settle right beside it.
-  { id: 10, key: 'volcanic', name: 'Volcanic', color: '#615a55', height: { base: 30, amp: 42, ridged: 0.7, freq: 0.014 }, weight: 0.0, scatter: 'rock',
+  // mountain massif — a lone cone rising out of flat scrubland. The TERRAIN here is
+  // deliberately LOW & flat (the drama is the cone mesh, placed on a flattened pad in
+  // world.js — see buildVolcano), so the volcano reads as ground-level, never perched
+  // on a peak. Its neighbours are low + barren so it reads isolated; Toaster can
+  // settle right beside it.
+  { id: 10, key: 'volcanic', name: 'Volcanic', color: '#3a342f', height: { base: 5, amp: 5, ridged: 0, freq: 0.02 }, weight: 0.0, scatter: 'rock',
     adj: { volcanic: 2, desert: 3, savanna: 3, plains: 2 } },
 ];
 

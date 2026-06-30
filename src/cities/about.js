@@ -4,7 +4,7 @@
 // airship, kites and windmills. Warm wood + cream canvas, Miyazaki-ish. A mini-map
 // portal returns you to the overview.
 import * as THREE from 'three';
-import { box, cyl, platform, glow, makeLabel, makePortal, tagPickable, sprawl } from './kit.js';
+import { box, cyl, platform, glow, makeLabel, makePortal, poiBeacon, tagPOI, tagPickable, sprawl } from './kit.js';
 
 const WOOD = 0x7a5230, DWOOD = 0x5c3d20, CANVAS = 0xeadfc6, CANVAS2 = 0xe4cfa0;
 const RUST = 0xc4763a, ROPE = 0xb8a274, ROCK = 0x9a8d78, LEAF = 0x6b9a47, WARM = 0xffd98a;
@@ -72,17 +72,75 @@ function makeTower(h) {
   return t;
 }
 
+// a little campus building — a schoolhouse (hip roof), with an optional dome (a
+// grande-école nod) or a modern flat-roof block (an office). An accent flag + a
+// front sign tie it to the field note it opens. Warm wood + cream, diorama-scale.
+function makeSchool(accent, style = 'house') {
+  const s = new THREE.Group();
+  const ac = new THREE.Color(accent);
+  // bright walls so the campus reads apart from the warm sprawl
+  const WALL = style === 'office' ? 0xe6dfcf : 0xf3ecda;
+  const bodyH = style === 'office' ? 7.5 : 4.6;
+  s.add(box(5, bodyH, 4.4, WALL, { pos: [0, bodyH / 2, 0], roughness: 0.82 }));
+  s.add(box(5.4, 0.5, 4.9, 0xb89a6e, { pos: [0, 0.25, 0] }));         // stone base
+
+  if (style === 'office') {
+    const slab = ac.clone().lerp(new THREE.Color(0x39434f), 0.4).getHex();
+    s.add(box(5.2, 0.5, 4.6, slab, { pos: [0, bodyH + 0.25, 0] }));   // flat roof slab
+    for (let i = 0; i < 3; i++)                                        // glass bands
+      s.add(box(4.6, 0.7, 0.12, 0xbfe3e8, { pos: [0, 1.7 + i * 2.1, 2.22], emissive: 0xbfe3e8, emissiveIntensity: 0.55, cast: false }));
+    s.add(box(0.5, 0.5, 0.5, accent, { pos: [2, bodyH + 0.8, -1.8], emissive: accent, emissiveIntensity: 1.6, cast: false })); // roof beacon
+  } else {
+    // accent-tinted hip roof → instantly tells the schools apart and colour-codes them
+    const roofCol = ac.clone().lerp(new THREE.Color(0x5c3d20), 0.38).getHex();
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(4.0, 2.6, 4),
+      new THREE.MeshStandardMaterial({ color: roofCol, flatShading: true, roughness: 0.9 }));
+    roof.rotation.y = Math.PI / 4; roof.position.y = bodyH + 1.3; roof.castShadow = true; s.add(roof);
+    if (style === 'dome') {                                            // a little cupola
+      s.add(cyl(0.95, 1.15, 1.0, WALL, 12, { pos: [0, bodyH + 2.6, 0] }));
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(1.05, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: ac, emissive: ac, emissiveIntensity: 0.35, flatShading: true, roughness: 0.5, metalness: 0.3 }));
+      dome.position.y = bodyH + 3.1; s.add(dome);
+    }
+    // two warm windows on the +z face
+    for (const dx of [-1.45, 1.45]) s.add(box(0.9, 1.05, 0.12, WARM, { pos: [dx, bodyH * 0.55, 2.22], emissive: WARM, emissiveIntensity: 0.7, cast: false }));
+  }
+  s.add(box(1.15, 1.95, 0.2, DWOOD, { pos: [0, 0.97, 2.22] }));       // door
+
+  // front sign board on a post (accent) — a little campus placard
+  s.add(cyl(0.1, 0.1, 2.3, WOOD, 5, { pos: [2.1, 1.15, 3.3] }));
+  s.add(box(2.0, 1.0, 0.16, accent, { pos: [2.1, 2.3, 3.3], emissive: accent, emissiveIntensity: 0.5, cast: false }));
+  // rooftop flag
+  s.add(cyl(0.05, 0.05, 2.3, DWOOD, 4, { pos: [-2.0, bodyH + 1.1, 1.7] }));
+  s.add(box(0.06, 0.85, 1.15, accent, { pos: [-2.0, bodyH + 1.6, 2.25], emissive: accent, emissiveIntensity: 0.5, cast: false }));
+  return s;
+}
+
+// a wooden fingerpost — the "contact" landmark (Email / GitHub / LinkedIn)
+function makeSignpost() {
+  const s = new THREE.Group();
+  s.add(cyl(0.2, 0.24, 6.5, WOOD, 6, { pos: [0, 3.25, 0] }));
+  s.add(cyl(0.34, 0.34, 0.3, RUST, 8, { pos: [0, 6.5, 0] }));          // finial cap
+  const arms = [[5.2, 0xc4763a, 0.4], [4.4, 0x3a7ca5, -0.7], [4.8, 0x6b9a47, -1.8]];
+  for (const [y, col, rot] of arms) {
+    const board = box(3.2, 0.7, 0.16, col, { pos: [1.5, y, 0], emissive: col, emissiveIntensity: 0.35 });
+    const arm = new THREE.Group(); arm.position.y = 0; arm.add(board);
+    arm.rotation.y = rot; s.add(arm);
+  }
+  return s;
+}
+
 export function build() {
   const g = new THREE.Group();
 
   g.add(platform(44, 0xb6a07e));
-  // a sparse warm hamlet at the base
-  g.add(sprawl({ rInner: 15, rOuter: 42, count: 40, seed: 44,
+  // a sparse warm hamlet on the OUTER ring only, so the campus + cliff read clearly
+  g.add(sprawl({ rInner: 21, rOuter: 42, count: 24, seed: 44,
     colors: [0xcdbf9c, 0xb89a6e, 0x9a8468, 0x7a5230, 0xd8c9a8],
-    lit: { color: WARM, p: 0.4 }, maxH: 7 }));
+    lit: { color: WARM, p: 0.4 }, maxH: 6 }));
 
   // ===== the climbing cliff (escalade) — a central craggy landmark =====
-  const cliff = new THREE.Group(); cliff.position.set(-9, 0, -2); g.add(cliff);
+  const cliff = new THREE.Group(); cliff.position.set(-9, 0, -2); g.add(cliff); tagPOI(cliff, 'climb');
   const rockMat = new THREE.MeshStandardMaterial({ color: 0xa3937b, flatShading: true, roughness: 1 });
   const rockMat2 = new THREE.MeshStandardMaterial({ color: 0x8c7e69, flatShading: true, roughness: 1 });
   // main tower + buttresses + an overhang slab → a rocky, non-boxy silhouette
@@ -166,6 +224,38 @@ export function build() {
     spinners.push({ hub, sp: 1.0 + Math.random() * 1.4 });
   }
 
+  // ===== the campus corner: the schools & jobs that built him =====
+  // a paved plaza ties the four buildings together as one "campus"
+  const plaza = box(30, 0.3, 11, 0xcabf9f, { pos: [-5, 0.16, -11], receive: true, cast: false });
+  g.add(plaza);
+  const campus = [
+    ['polytechnique', '#b5402f', 'dome', -16, -9],
+    ['telecom', '#3a7ca5', 'house', -9, -12],
+    ['ensta', '#6b9a47', 'house', -1, -13.5],
+    ['rubicon', '#d4a84b', 'office', 6, -11],
+  ];
+  for (const [id, accent, style, x, z] of campus) {
+    const sc = makeSchool(accent, style);
+    sc.position.set(x, 0.3, z);
+    sc.rotation.y = Math.atan2(-x, -z);          // turn the door toward the centre
+    g.add(sc); tagPOI(sc, id);
+  }
+  // the contact fingerpost
+  const sign = makeSignpost(); sign.position.set(17, 0, 2); g.add(sign); tagPOI(sign, 'contact');
+
+  // ===== floating markers over every readable landmark =====
+  const pois = [];
+  const addBeacon = (id, accent, x, y, z) => {
+    const b = poiBeacon(accent); b.group.position.set(x, y, z); g.add(b.group);
+    tagPOI(b.group, id); pois.push({ id, accent, beacon: b });
+  };
+  addBeacon('polytechnique', '#b5402f', -16, 15, -9);
+  addBeacon('telecom', '#3a7ca5', -9, 13, -12);
+  addBeacon('ensta', '#6b9a47', -1, 13, -13.5);
+  addBeacon('rubicon', '#d4a84b', 6, 15, -11);
+  addBeacon('climb', '#c4763a', -8.5, 25, -1.7);
+  addBeacon('contact', '#8b6845', 17, 9.5, 2);
+
   // ===== portal back to the map =====
   const portal = makePortal('#c4763a');
   portal.group.position.set(13, 0, 11); g.add(portal.group);
@@ -177,8 +267,10 @@ export function build() {
 
   return {
     group: g, label,
+    pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
     update(t, dt) {
       portal.update(t);
+      for (const p of pois) p.beacon.update(t);
       for (const f of flyers) {
         const a = t * f.sp + f.ph;
         f.o.position.set(f.cx + Math.cos(a) * f.r, f.y + Math.sin(t * 0.5 + f.ph) * f.bob, f.cz + Math.sin(a) * f.r);

@@ -40,7 +40,9 @@ export function createStage(container) {
   // sea fades seamlessly into the sky. Fog colour matches the horizon band.
   const HORIZON = new THREE.Color('#ece3d0');
   scene.background = makeSkyTexture();
-  scene.fog = new THREE.Fog(HORIZON.getHex(), 620, 1850);
+  // fog closes the distance so the big terrain fades to the horizon haze well before
+  // its far square edge — the edge sits past `far` and is never visible.
+  scene.fog = new THREE.Fog(HORIZON.getHex(), 560, 1400);
 
   // Lighting: a soft warm key (sun) + cool sky fill (hemisphere) for gentle
   // form-reading shadows without harsh contrast — reads like watercolor light.
@@ -52,8 +54,8 @@ export function createStage(container) {
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 80;
-  sun.shadow.camera.far = 1900;
-  const S = 560;
+  sun.shadow.camera.far = 2400;
+  const S = 820;
   sun.shadow.camera.left = -S;
   sun.shadow.camera.right = S;
   sun.shadow.camera.top = S;

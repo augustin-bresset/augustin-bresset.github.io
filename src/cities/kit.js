@@ -160,6 +160,74 @@ export function makePortal(accent = '#e9dcc0') {
   };
 }
 
+// POI MARKER — a small floating "survey marker" that hovers over a landmark to
+// say "there's something to read here". An emissive gem on a downward pin-tip with
+// a faint ground ring, color-matched to the note it opens. Reads on both the dark
+// cyberpunk districts and the light wind-city. The whole group is the pick anchor
+// (its world position drives where the field-note slip is pinned on screen).
+// Returns { group, anchor, setState, update }. Fold update into the city's loop.
+export function poiBeacon(accent = '#e9dcc0') {
+  const g = new THREE.Group();
+  const ac = new THREE.Color(accent);
+
+  // the bobbing part (gem + pin tip), kept on an inner node so the group origin
+  // stays a steady screen anchor for the card.
+  const float = new THREE.Group(); g.add(float);
+  const gemMat = new THREE.MeshStandardMaterial({
+    color: ac, emissive: ac, emissiveIntensity: 1.8, flatShading: true,
+    roughness: 0.25, metalness: 0.1,
+  });
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.95, 0), gemMat);
+  gem.castShadow = false; float.add(gem);
+  // downward pin tip so it reads as "pointing here"
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.2, 6), gemMat);
+  tip.position.y = -1.15; tip.rotation.x = Math.PI; tip.castShadow = false; float.add(tip);
+
+  // faint ground ring at the landmark
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.07, 6, 30),
+    new THREE.MeshBasicMaterial({ color: ac, transparent: true, opacity: 0.45, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; g.add(ring);
+  // a soft halo billboard so the marker is legible against busy scenery
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: haloTexture(accent), transparent: true, depthWrite: false, opacity: 0.6,
+  }));
+  halo.scale.set(4.4, 4.4, 1); float.add(halo);
+
+  let state = 'idle';
+  return {
+    group: g, anchor: g,
+    setState(s) { state = s; },
+    update(t) {
+      const hov = state !== 'idle';
+      const sc = state === 'open' ? 1.45 : state === 'hover' ? 1.3 : 1;
+      float.position.y = Math.sin(t * 1.6) * 0.28 + (hov ? 0.4 : 0);
+      float.scale.setScalar(sc);
+      gem.rotation.y = t * 0.9;
+      gemMat.emissiveIntensity = (hov ? 2.8 : 1.7) + Math.sin(t * 3) * 0.4;
+      ring.material.opacity = (hov ? 0.85 : 0.4) + Math.sin(t * 2) * 0.08;
+      const rs = sc * (1 + (hov ? Math.sin(t * 2.4) * 0.06 : 0));
+      ring.scale.setScalar(rs);
+      halo.material.opacity = hov ? 0.85 : 0.5;
+    },
+  };
+}
+
+// radial-gradient halo sprite behind a marker gem (so it pops on any background)
+function haloTexture(accent) {
+  const s = 128;
+  const cv = document.createElement('canvas'); cv.width = s; cv.height = s;
+  const ctx = cv.getContext('2d');
+  const grd = ctx.createRadialGradient(s / 2, s / 2, 2, s / 2, s / 2, s / 2);
+  const c = new THREE.Color(accent);
+  const rgb = `${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0}`;
+  grd.addColorStop(0, `rgba(${rgb},0.85)`);
+  grd.addColorStop(0.35, `rgba(${rgb},0.32)`);
+  grd.addColorStop(1, `rgba(${rgb},0)`);
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // language-neutral round-arrow-over-globe icon used by the portal
 function makeGlyphSprite(accent) {
   const s = 128;
@@ -234,6 +302,15 @@ function roundRect(ctx, x, y, w, h, r) {
 // mark every mesh in a subtree as belonging to a city (for raycast picking)
 export function tagPickable(root, cityId) {
   root.traverse((o) => { if (o.isMesh || o.isSprite) o.userData.cityId = cityId; });
+}
+
+// mark a whole landmark (a building, the cliff, a beacon) as a Point Of Interest.
+// navigation walks ancestors looking for userData.poi, so tagging the root group is
+// enough — but we set it on every child too, so a click anywhere on the structure
+// (or its floating marker) opens that landmark's field note.
+export function tagPOI(root, poiId) {
+  root.userData.poi = poiId;
+  root.traverse((o) => { o.userData.poi = poiId; });
 }
 
 // Deterministic small PRNG so a city's sprawl is stable across frames.
