@@ -25,10 +25,13 @@
 
     <nav class="navbar">
         <div class="container nav-container">
-            <a href="#" class="logo">Profil</a>
+            <a href="#" class="logo">
+                <img src="logo/personal_logo.svg" alt="Logo" style="height: 40px; width: auto; vertical-align: middle;">
+            </a>
             <ul class="nav-links">
                 <li><a href="#about">À propos</a></li>
                 <li><a href="#experience">Expérience</a></li>
+                <li><a href="#education">Formation</a></li>
                 <li><a href="#projects">Projets</a></li>
                 <li><a href="#skills">Compétences</a></li>
                 <li><a href="#contact" class="btn-primary">Contact</a></li>
@@ -128,6 +131,7 @@
                         <div class="timeline-dot"></div>
                         <div class="timeline-date">Sept 2024 – Fév 2025</div>
                         <div class="timeline-content">
+                            <img src="logo/Logo_ENSTA-2025-u2is.svg" alt="ENSTA Logo" class="timeline-logo">
                             <h3>Stagiaire Recherche</h3>
                             <h4>ENSTA Paris • Palaiseau, France</h4>
                             <ul>
@@ -166,6 +170,7 @@
                 <div class="education-grid">
                     <div class="card education-card">
                         <div class="card-header">
+                            <img src="logo/POLYTECHNIQUE-IP_PARIS.png" alt="Polytechnique Logo" class="card-logo">
                             <h3>Master Data Science</h3>
                             <span class="institution">École Polytechnique</span>
                             <span class="year">2025 – 2026</span>
@@ -179,14 +184,15 @@
 
                     <div class="card education-card">
                         <div class="card-header">
+                            <img src="logo/Logo_Télécom_SudParis.svg" alt="Télécom SudParis Logo" class="card-logo">
                             <h3>Cycle Ingénieur Informatique</h3>
                             <span class="institution">Télécom SudParis</span>
                             <span class="year">2022 – 2026</span>
                         </div>
                         <div class="card-body">
                             <p>Majeure Data Science & Intelligence Artificielle.</p>
-                            <p class="course-list"><strong>Cours pertinents :</strong> Processus Stochastiques (GPA
-                                4.0), Réseaux de neurones (GPA 4.0), Apprentissage par renforcement (GPA 4.0).</p>
+                            <p class="course-list"><strong>Cours pertinents :</strong> Processus Stochastiques,
+                                Réseaux de neurones, Apprentissage par renforcement.</p>
                         </div>
                     </div>
 
@@ -196,13 +202,12 @@
                             <span class="institution">ENS Paris-Saclay</span>
                             <span class="year">2024 – 2025</span>
                         </div>
-                        <div class="card-body">
-                            <p>Cours : Nuages de points et modélisation (NPM3D) - Validé.</p>
-                        </div>
+
                     </div>
 
                     <div class="card education-card">
                         <div class="card-header">
+                            <img src="logo/saint-louis-logo.png" alt="Saint-Louis Logo" class="card-logo">
                             <h3>Classes Préparatoires</h3>
                             <span class="institution">Lycée Saint-Louis</span>
                             <span class="year">2021 – 2022</span>
@@ -260,6 +265,67 @@
                                 <span>ROS</span>
                                 <span>C++</span>
                                 <span>Python</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ragondin -->
+                    <div class="card project-card">
+                        <div class="project-content">
+                            <h3>Ragondin</h3>
+                            <span class="project-tag">IA & RAG</span>
+                            <p>Toolkit RAG local et léger. Fonctionnalités d'indexation incrémentale, intégration FAISS
+                                et embeddings configurables.</p>
+                            <div class="tech-stack">
+                                <span>Python</span>
+                                <span>LangChain</span>
+                                <span>FAISS</span>
+                                <span>Transformers</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Apairo -->
+                    <div class="card project-card">
+                        <div class="project-content">
+                            <h3>Data Apairo</h3>
+                            <span class="project-tag">Robotique & Données</span>
+                            <p>Framework complet pour la gestion de datasets temporels asynchrones en robotique. Outils
+                                de chargement et traitement.</p>
+                            <div class="tech-stack">
+                                <span>Python</span>
+                                <span>PyTorch</span>
+                                <span>Docker</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PlayShare -->
+                    <div class="card project-card">
+                        <div class="project-content">
+                            <h3>PlayShare</h3>
+                            <span class="project-tag">Développement Web</span>
+                            <p>Outil de transfert de playlists multi-plateformes. Permet le partage et le transfert
+                                entre Spotify, Apple Music, etc.</p>
+                            <div class="tech-stack">
+                                <span>Python</span>
+                                <span>APIs</span>
+                                <span>Web</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MCGDiff -->
+                    <div class="card project-card">
+                        <div class="project-content">
+                            <h3>MCGDiff & Diffusion</h3>
+                            <span class="project-tag">Recherche & IA</span>
+                            <p>Implémentation de recherche sur les modèles de diffusion. Reproduction des résultats de
+                                "Denoising Diffusion Samplers".</p>
+                            <div class="tech-stack">
+                                <span>Python</span>
+                                <span>PyTorch</span>
+                                <span>JAX</span>
                             </div>
                         </div>
                     </div>
