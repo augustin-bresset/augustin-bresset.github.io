@@ -38,7 +38,9 @@ function boot() {
   const navLang = (navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
   LANG.current = qp.get('lang') === 'fr' ? 'fr' : qp.get('lang') === 'en' ? 'en' : navLang;
 
-  const world = buildWorld(stage, seed);
+  // island (default, light) or the heavier endless continent via ?mode=land
+  const mode = qp.get('mode') === 'land' ? 'land' : 'island';
+  const world = buildWorld(stage, seed, { mode });
   stage.scene.add(world.group);
 
   const reduceMotion = window.matchMedia &&

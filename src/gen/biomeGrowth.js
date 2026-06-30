@@ -7,10 +7,10 @@
 //
 // Special seeding: a patch of OCEAN in one random corner (NOT a full island) and
 // one random VOLCANIC hotspot.
-import { mulberry32 } from './noise.js';
+import { mulberry32, Simplex } from './noise.js';
 import { BIOME, BIOMES, adjWeight } from './biomes.js';
 
-export function growBiomes(graph, seed) {
+export function growBiomes(graph, seed, { mode = 'island' } = {}) {
   const { sites, neighbors, cols, rows } = graph;
   const rand = mulberry32((seed ^ 0xb107e9a1) >>> 0);
 
@@ -61,27 +61,43 @@ export function growBiomes(graph, seed) {
     return BIOME.PLAINS;
   }
 
-  // --- 1. OCEAN anchor: pick a random rim spot, flood a blob of sites to ocean ---
-  // The anchor is a CORNER or an EDGE MIDPOINT (8 choices) so the coastline isn't
-  // forever the same corner diagonal — half the time the sea hugs a straight edge.
-  const mc = (cols - 1) / 2 | 0, mr = (rows - 1) / 2 | 0;
-  const anchors = [
-    [0, 0], [cols - 1, 0], [0, rows - 1], [cols - 1, rows - 1],  // 4 corners
-    [mc, 0], [mc, rows - 1], [0, mr], [cols - 1, mr],            // 4 edge midpoints
-  ];
-  const [ocx, ocy] = anchors[(rand() * anchors.length) | 0];
-  const oceanReach = 2.4 + (rand() * 2.6);   // in site cells
-  for (const s of sites) {
-    const d = Math.hypot(s.c - ocx, s.r - ocy);
-    if (d < oceanReach + rand() * 1.2) assign(s, BIOME.OCEAN);
+  // --- 1. OCEAN ---
+  if (mode === 'island') {
+    // ISLAND coast: turn sites to OCEAN as they get far from the centre, with a
+    // WOBBLY shoreline (low-freq noise → bays & capes) plus a probabilistic fringe
+    // for a broken coast. The shore therefore follows the Voronoi cells, never a
+    // circle or a square. Ocean stays seed-only (excluded from growth below) so the
+    // coastline is exactly this land/sea cell boundary.
+    const sim = new Simplex((seed ^ 0x151a4d) >>> 0);
+    const cgx = (cols - 1) / 2, cgy = (rows - 1) / 2;
+    const maxR = Math.hypot(cgx, cgy);
+    for (const s of sites) {
+      const d = Math.hypot(s.c - cgx, s.r - cgy) / maxR;          // 0 centre .. 1 corner
+      const wob = sim.fbm(s.c * 0.17, s.r * 0.17, { octaves: 3 }); // ~ -1..1
+      const coast = 0.56 + 0.17 * wob;                            // organic shoreline
+      if (d > coast) assign(s, BIOME.OCEAN);
+      else if (d > coast - 0.12 && rand() < (d - (coast - 0.12)) / 0.12 * 0.55) assign(s, BIOME.OCEAN);
+    }
+    graph.oceanCorner = { x: 0, z: 0 };
+  } else {
+    // ENDLESS LAND (?mode=land): a single local bay at one rim anchor (corner or edge
+    // midpoint); land runs off the other edges — a continental coast, not a ring.
+    const mc = (cols - 1) / 2 | 0, mr = (rows - 1) / 2 | 0;
+    const anchors = [
+      [0, 0], [cols - 1, 0], [0, rows - 1], [cols - 1, rows - 1],  // 4 corners
+      [mc, 0], [mc, rows - 1], [0, mr], [cols - 1, mr],            // 4 edge midpoints
+    ];
+    const [ocx, ocy] = anchors[(rand() * anchors.length) | 0];
+    const oceanReach = 2.4 + (rand() * 2.6);   // in site cells
+    for (const s of sites) {
+      const d = Math.hypot(s.c - ocx, s.r - ocy);
+      if (d < oceanReach + rand() * 1.2) assign(s, BIOME.OCEAN);
+    }
+    graph.oceanCorner = {
+      x: (ocx / (cols - 1)) * 2 - 1,
+      z: (ocy / (rows - 1)) * 2 - 1,
+    };
   }
-  // remember the ocean anchor as a normalised direction (-1..1) so the heightmap
-  // can open a local bay on that side while letting land run off the other edges
-  // (a continental coast, NOT a ringed island).
-  graph.oceanCorner = {
-    x: (ocx / (cols - 1)) * 2 - 1,
-    z: (ocy / (rows - 1)) * 2 - 1,
-  };
 
   // --- 2. VOLCANIC hotspot: one inland site near the CENTRE (so the lone volcano,
   // when it spawns, sits in the reachable heart of the map) grown to a SMALL blob so
@@ -110,9 +126,12 @@ export function growBiomes(graph, seed) {
   }
 
   // --- 4. grow: repeatedly assign frontier cells from neighbour adjacency ---
-  // VOLCANIC is excluded so it never sprawls past its seeded blob (its dry desert/
-  // savanna neighbours grow around it instead); ocean still spreads from the bay.
-  const CANDIDATES = BIOMES.map((b) => b.id).filter((id) => id !== BIOME.VOLCANIC);
+  // VOLCANIC is always excluded so it never sprawls past its seeded blob. In ISLAND
+  // mode OCEAN is excluded too, so the shoreline stays exactly the seeded Voronoi
+  // land/sea boundary (land grows up to it as beach/plains); in land mode the bay
+  // may still spread.
+  const CANDIDATES = BIOMES.map((b) => b.id).filter((id) =>
+    id !== BIOME.VOLCANIC && (mode !== 'island' || id !== BIOME.OCEAN));
   let remaining = sites.filter((s) => s.biome === -1).length;
   let guard = sites.length * 4;
 

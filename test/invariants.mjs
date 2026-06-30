@@ -11,7 +11,8 @@ import { makeField, WATER_Y } from '../src/gen/heightmap.js';
 import { BIOME } from '../src/gen/biomes.js';
 
 const SEEDS = [1, 3, 5, 7, 11, 21, 42, 100, 777, 2024];
-const SIZE = 2800, SPACING = 54, N = 192;   // big terrain grid (N lower than runtime for speed)
+const SIZE = 1600, SPACING = 54, N = 192;   // island preset (default mode); N lower for speed
+const MODE = 'island';
 const LAND_Y = WATER_Y + 1.0;               // clearly-above-water counts as land
 
 const BIOME_NAME = Object.fromEntries(Object.entries(BIOME).map(([k, v]) => [v, k]));
@@ -27,8 +28,8 @@ const LIMITS = {
 
 function analyze(seed) {
   const graph = makeSites(seed, { size: SIZE, spacing: SPACING });
-  growBiomes(graph, seed);
-  const field = makeField(seed, { size: SIZE, N }, graph);
+  growBiomes(graph, seed, { mode: MODE });
+  const field = makeField(seed, { size: SIZE, N, mode: MODE }, graph);
 
   // ---- land connectivity (flood-fill the height grid) ----
   const { idx, heights } = field;
