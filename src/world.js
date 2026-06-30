@@ -19,23 +19,28 @@ import { CITIES } from './cities/registry.js';
 import { placeCities } from './cities/placement.js';
 
 // WORLD is the PLAYABLE / camera reference scale (immersed view, city roam disc).
-// TERRAIN is the much larger grid the world is actually generated on, so the map's
-// finite square edge sits far past the fog wall AND far past anywhere the camera can
-// pan — you never see it cut off. Cities + the volcano stay in the central disc.
+// Two generation PRESETS share that camera scale:
+//   island (default) — a big island whose coast follows the Voronoi cells (sea is
+//     forced as you get far from centre); a modest grid, so it loads fast anywhere.
+//   land  (?mode=land) — the much larger endless continent; heavier to load.
 export const WORLD = { size: 1000, half: 500 };
-const TERRAIN = { size: 2800, half: 1400, N: 512 };
+const PRESETS = {
+  island: { size: 1600, half: 800, N: 320 },
+  land: { size: 2800, half: 1400, N: 512 },
+};
 
-export function buildWorld(stage, seed) {
+export function buildWorld(stage, seed, { mode = 'island' } = {}) {
+  const cfg = PRESETS[mode] || PRESETS.island;
   const group = new THREE.Group();
   const updaters = [];
   const cities = [];
 
-  // 1. Voronoi biome cells + constrained sequential growth (over the big grid)
-  const graph = makeSites(seed, { size: TERRAIN.size, spacing: 54 });
-  growBiomes(graph, seed);
+  // 1. Voronoi biome cells + constrained sequential growth
+  const graph = makeSites(seed, { size: cfg.size, spacing: 54 });
+  growBiomes(graph, seed, { mode });
 
-  // 2. big grid heightfield (per-biome fBM, blended)
-  const field = makeField(seed, { size: TERRAIN.size, N: TERRAIN.N }, graph);
+  // 2. grid heightfield (per-biome fBM, blended)
+  const field = makeField(seed, { size: cfg.size, N: cfg.N, mode }, graph);
 
   // 3. rivers carve the heightfield before meshing
   const hydro = carveRivers(field, seed);
@@ -90,7 +95,7 @@ export function buildWorld(stage, seed) {
   // 6b. scenic orientation: face the home camera toward the tallest distant terrain
   // (a natural mountain mass) so there are real mountains on the horizon ahead — no
   // bolted-on backdrop, just the generated range, sitting where the camera looks.
-  const scenicAzimuth = scenicDirection(field) - Math.PI;
+  const scenicAzimuth = scenicDirection(field, cfg.half) - Math.PI;
 
   // 7. rivers
   const rivers = buildRivers(hydro, field);
@@ -125,12 +130,12 @@ export function buildWorld(stage, seed) {
   }
 
   // 11. clouds — a few drifters overhead + a soft distant band at the fog horizon
-  const clouds = buildClouds(seed, TERRAIN.half);
+  const clouds = buildClouds(seed, cfg.half);
   group.add(clouds.group);
   updaters.push((t, dt) => clouds.update(t, dt));
 
-  // 12. sea (covers the far bay + the horizon; segment count is capped in water.js)
-  const sea = buildSea(TERRAIN.size);
+  // 12. sea (covers the surrounding ocean + the horizon; segments capped in water.js)
+  const sea = buildSea(cfg.size);
   group.add(sea.mesh);
   updaters.push((t) => sea.update(t));
 
@@ -140,8 +145,8 @@ export function buildWorld(stage, seed) {
 // Angle (world XZ) of the tallest distant terrain — sampled on a mid-far ring that
 // sits inside the visible (pre-fog) range, so the home view always opens onto the
 // generated mountains rather than flat plains.
-function scenicDirection(field) {
-  const STEPS = 60, radii = [620, 820, 1040];
+function scenicDirection(field, half) {
+  const STEPS = 60, radii = [0.46 * half, 0.62 * half, 0.80 * half];
   let bestTh = 0, bestH = -Infinity;
   for (let a = 0; a < STEPS; a++) {
     const th = (a / STEPS) * Math.PI * 2;

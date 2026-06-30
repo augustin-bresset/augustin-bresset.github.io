@@ -11,7 +11,7 @@ export const WATER_Y = 0;
 // per-biome moisture target (drives scatter + river-bank life)
 const MOIST = [0.9, 0.5, 0.45, 0.75, 0.4, 0.3, 0.25, 0.08, 0.2, 0.85, 0.1];
 
-export function makeField(seed, { size = 1000, N = 256 } = {}, graph) {
+export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, graph) {
   const half = size / 2;
   const simElev = new Simplex(seed);
   const simWarpX = new Simplex(seed ^ 0x9e3779b1);
@@ -61,26 +61,30 @@ export function makeField(seed, { size = 1000, N = 256 } = {}, graph) {
       const ridge = rg * amp;
       let y = base + lerp(smooth, ridge, ridged);
 
-      // Coastline shaping — ONE coast, otherwise ENDLESS LAND.
-      // A single LOCAL bay of open sea is anchored at one rim spot (a corner OR an
-      // edge midpoint — chosen in biomeGrowth). That bay is the only place land meets
-      // sea. EVERYWHERE ELSE the land simply runs off the map edge — no ringed
-      // coastline, so it never reads as an island and never as a cube. The terrain's
-      // actual rim is swallowed by the dense horizon mist (clouds.js) + fog, so the
-      // continent appears to continue to the horizon. A heavy low-freq warp keeps the
-      // bay's shore crooked.
-      const nx = wx / half, nz = wz / half;            // [-1,1]
-      const wob = 0.13 * simWarpX.fbm(wx * 0.0055 + 5, wz * 0.0055 - 2, { octaves: 4 });
-      const oc = (graph && graph.oceanCorner) || { x: -1, z: -1 };
-      const dAnchor = Math.hypot(nx - oc.x, nz - oc.z) + wob;
-      const bay = 1 - smoothstep(0.35, 1.05, dAnchor);  // 1 = open sea at the anchor
-      // gentle ROUND roll-off toward the rim — purely lowers land height (it never
-      // dips to water, so there's no square coastline), keeping edge terrain low
-      // enough for the horizon mist to hide where the mesh actually stops.
-      const emR = Math.hypot(nx, nz);                   // round: 0 centre .. ~1.41 corner
-      const rimRoll = 1 - 0.4 * smoothstep(0.82, 1.3, emR + wob);
-      const land = 1 - bay;
-      y = (y * rimRoll) * land - bay * 18;
+      if (mode === 'island') {
+        // ISLAND: the coastline IS the Voronoi land/sea cell boundary (ocean-biome
+        // cells already sink to base -20, and the 3-site blend gives a beach slope),
+        // so it follows the cells organically — never a circle or a square. Here we
+        // only deepen the OPEN sea further out so it reads as ocean to the horizon,
+        // without touching that shoreline.
+        const emR = Math.hypot(wx / half, wz / half);   // 0 centre .. ~1.41 corner
+        y -= 20 * smoothstep(0.74, 1.15, emR);
+      } else {
+        // ENDLESS LAND — ONE coast, otherwise land runs off every edge.
+        // A single LOCAL bay of open sea is anchored at one rim spot (corner or edge
+        // midpoint — chosen in biomeGrowth). EVERYWHERE ELSE the land simply runs off
+        // the map edge — no ringed coastline — and the rim is swallowed by fog. A
+        // heavy low-freq warp keeps the bay's shore crooked.
+        const nx = wx / half, nz = wz / half;            // [-1,1]
+        const wob = 0.13 * simWarpX.fbm(wx * 0.0055 + 5, wz * 0.0055 - 2, { octaves: 4 });
+        const oc = (graph && graph.oceanCorner) || { x: -1, z: -1 };
+        const dAnchor = Math.hypot(nx - oc.x, nz - oc.z) + wob;
+        const bay = 1 - smoothstep(0.35, 1.05, dAnchor); // 1 = open sea at the anchor
+        const emR = Math.hypot(nx, nz);                  // round: 0 centre .. ~1.41 corner
+        const rimRoll = 1 - 0.4 * smoothstep(0.82, 1.3, emR + wob);
+        const land = 1 - bay;
+        y = (y * rimRoll) * land - bay * 18;
+      }
 
       heights[idx(i, j)] = y;
 
