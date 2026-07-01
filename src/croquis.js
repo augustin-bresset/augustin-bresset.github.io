@@ -298,7 +298,7 @@ export function buildCroquis(stage, container, seed) {
 
       // ---------- origin rebase (infinite-flight precision) ----------
       if (pos.lengthSq() > 6000 * 6000) {
-        const shift = _v.copy(pos);
+        const shift = pos.clone();          // NOT a shared temp — rebuildCluster uses _v
         pos.sub(shift);
         for (const cl of clusters) { cl.base.sub(shift); rebuildCluster(cl); }
         for (const tw of towers) { tw.base.sub(shift); tw.group.position.copy(tw.base); }
