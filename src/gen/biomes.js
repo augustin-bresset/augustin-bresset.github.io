@@ -62,6 +62,7 @@ export function adjWeight(aId, bId) {
 // muted base colours, pre-parsed
 const COL = BIOMES.map((b) => new THREE.Color(b.color));
 const _paper = new THREE.Color('#cabfa6'); // paper tone for desaturation
+const _white = new THREE.Color('#ffffff'); // pastel lift (keeps hue, raises lightness)
 
 export function biomeBaseColor(id) { return COL[id]; }
 
@@ -105,8 +106,10 @@ export function faceColor(out, biomeId, y, slope, jitter = 0) {
   }
   // subtle facet jitter
   if (jitter) out.offsetHSL(0, 0, jitter);
-  // desaturate toward the active theme's paper tone (the "brouillon" muting) — the
-  // sketch theme pushes this much stronger for a pale pencil-and-wash look.
+  // CROQUIS pastel: lift toward white so the colour stays (its hue) but goes pale
+  // and chalky — "beaucoup de couleur mais pâle", like a soft pastel / Petit Prince
+  // drawing. Then a hint toward the warm paper tone. (pastel is 0 in the diorama.)
+  if (ACTIVE.pastel) out.lerp(_white, ACTIVE.pastel);
   out.lerp(_paper.set(ACTIVE.paperTone), ACTIVE.paperLerp);
   return out;
 }

@@ -19,29 +19,30 @@ export const THEMES = {
     sunColor: '#fff1d6', sunInt: 1.12, sunShadow: true,
     ambient: '#5a4a36', ambientInt: 0.42,
     exposure: 0.98,
-    paperLerp: 0.17, paperTone: '#cabfa6',
+    paperLerp: 0.17, paperTone: '#cabfa6', pastel: 0,
     water: '#3f7e96', waterFloor: '#244e5e', waterOpacity: 0.9,
     outline: false, outlineStrength: 0.0, ink: '#2a1808',
     desat: 0, wash: 0, washTone: '#efe9db', hatch: 0,
     bodyClass: '',
   },
-  // a full CROQUIS ambiance: the world redrawn as a graphite-and-wash sketchbook
-  // page — near-monochrome pencil tones on warm paper, ink silhouettes, and real
-  // pencil HATCHING that thickens in the shadows (the post pass does the hatch).
-  // Flat, bright paper light so form is carried by line + hatch, not smooth shading.
+  // a PASTEL CROQUIS ambiance: the world redrawn like a soft coloured-pencil / pastel
+  // sketch — "beaucoup de couleur mais pâle", à la Petit Prince, a drawing left
+  // half-finished. The look comes from the TERRAIN itself (pale pastel vertex colours
+  // + flat paper light + the paper-grain overlay), NOT from any full-screen filter:
+  // no outline pass, no desaturation, no hatching.
   sketch: {
     key: 'sketch', name: 'Croquis', label: '✎',
-    sky: ['#efece3', '#f4f1e9', '#f8f6f0'],   // flat pale paper
-    fog: '#f1eee4', fogNear: 470, fogFar: 1150,
-    hemiSky: '#ffffff', hemiGround: '#e2dac9', hemiInt: 1.2,   // flat & bright
-    sunColor: '#fffaf0', sunInt: 0.4, sunShadow: true,          // faint → soft shadows
-    ambient: '#d3cab6', ambientInt: 0.84,
-    exposure: 1.3,                             // washed out, bright paper
-    paperLerp: 0.6, paperTone: '#e9e2d3',      // strong pale wash on the terrain
-    water: '#c4ccc8', waterFloor: '#adb4b0', waterOpacity: 0.68,
-    outline: true, outlineStrength: 1.0, ink: '#372f26',        // graphite, not black
-    desat: 0.82, wash: 0.28, washTone: '#efe7d6',             // pale near-monochrome
-    hatch: 0,                                  // (no screen-space hatching — Augustin)
+    sky: ['#e7eef1', '#f0f1ea', '#f6f4ec'],   // soft watercolour paper (cool→warm)
+    fog: '#eef0e8', fogNear: 500, fogFar: 1250,
+    hemiSky: '#ffffff', hemiGround: '#e7dfce', hemiInt: 1.14,  // flat & bright
+    sunColor: '#fff5e6', sunInt: 0.55, sunShadow: true,        // gentle, soft shadows
+    ambient: '#d6cdba', ambientInt: 0.78,
+    exposure: 1.24,                            // bright, washed paper
+    paperLerp: 0.16, paperTone: '#f0e7d2',     // faint warm-paper tint (keeps colour)
+    pastel: 0.44,                              // lift colours toward white → pale pastel
+    water: '#a9cdd6', waterFloor: '#9dc0c8', waterOpacity: 0.66,
+    outline: false, outlineStrength: 0.0, ink: '#6b5a45',       // (no post-process line)
+    desat: 0, wash: 0, washTone: '#efe7d6', hatch: 0,          // NO full-screen filter
     bodyClass: 'theme-sketch',
   },
 };

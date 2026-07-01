@@ -2,12 +2,15 @@
 // Conifers (cones) + broadleaf (faceted blobs), each on a short trunk.
 // Sway is done in the vertex shader, phased per-instance, foliage-only.
 import * as THREE from 'three';
+import { ACTIVE } from '../themes.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
 const _s = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
+const _white = new THREE.Color(0xffffff);
+const _col = new THREE.Color();
 
 // inject wind sway into a foliage material
 function addSway(mat, uniforms, strength) {
@@ -27,6 +30,20 @@ function addSway(mat, uniforms, strength) {
   };
 }
 
+// per-instance colour = the base tint, then lifted toward white by the theme's
+// pastel amount (0 in the diorama) so foliage goes pale in the croquis, matching
+// the pastel terrain instead of popping as saturated green.
+function paintInstances(mesh, list) {
+  let n = 0;
+  for (const t of list) {
+    _col.copy(mesh.userData.tintColor(t.tint ?? 0.5));
+    if (ACTIVE.pastel) _col.lerp(_white, ACTIVE.pastel * 0.85);
+    mesh.setColorAt(n, _col);
+    n++;
+  }
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+}
+
 function fillInstances(mesh, list, yLift, baseScale) {
   let n = 0;
   for (const t of list) {
@@ -35,20 +52,18 @@ function fillInstances(mesh, list, yLift, baseScale) {
     _s.setScalar((t.scale || 1) * baseScale);
     _m.compose(_p, _q, _s);
     mesh.setMatrixAt(n, _m);
-    // subtle per-instance colour variation
-    const tint = t.tint ?? 0.5;
-    mesh.setColorAt(n, mesh.userData.tintColor(tint));
     n++;
   }
   mesh.count = n;
   mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  paintInstances(mesh, list);            // colours (pastel-aware)
 }
 
 export function buildTrees(scatter) {
   const group = new THREE.Group();
   group.name = 'trees';
   const uniforms = { uTime: { value: 0 } };
+  const painted = [];             // {mesh, list} foliage/trunk for pastel restyle
 
   const conifers = scatter.trees.filter((t) => t.kind === 'conifer');
   const broads = scatter.trees.filter((t) => t.kind === 'broad');
@@ -72,7 +87,7 @@ export function buildTrees(scatter) {
     foli.userData.tintColor = tintConifer;
     foli.castShadow = true;
     fillInstances(foli, conifers, 1.2, 1);
-    group.add(foli);
+    group.add(foli); painted.push({ mesh: foli, list: conifers });
 
     const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 2.6, 5);
     trunkGeo.translate(0, 1.3, 0);
@@ -80,7 +95,7 @@ export function buildTrees(scatter) {
     trunk.userData.tintColor = () => new THREE.Color(0x6b4f33);
     trunk.castShadow = true;
     fillInstances(trunk, conifers, 0, 1);
-    group.add(trunk);
+    group.add(trunk); painted.push({ mesh: trunk, list: conifers });
   }
 
   // ---- broadleaf ----
@@ -94,7 +109,7 @@ export function buildTrees(scatter) {
     foli.userData.tintColor = tintBroad;
     foli.castShadow = true;
     fillInstances(foli, broads, 1.0, 1);
-    group.add(foli);
+    group.add(foli); painted.push({ mesh: foli, list: broads });
 
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.32, 2.4, 5);
     trunkGeo.translate(0, 1.2, 0);
@@ -102,12 +117,14 @@ export function buildTrees(scatter) {
     trunk.userData.tintColor = () => new THREE.Color(0x6b4f33);
     trunk.castShadow = true;
     fillInstances(trunk, broads, 0, 1);
-    group.add(trunk);
+    group.add(trunk); painted.push({ mesh: trunk, list: broads });
   }
 
   return {
     group,
     update(t) { uniforms.uTime.value = t; },
+    // recolour foliage/trunks for the active theme's pastel (no geometry rebuild)
+    restyle() { for (const p of painted) paintInstances(p.mesh, p.list); },
     count: scatter.trees.length,
   };
 }
