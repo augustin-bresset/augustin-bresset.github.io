@@ -121,6 +121,7 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
       id: pad.city.id, radius: pad.city.radius,
       group: built.group, label: built.label,
       pois: built.pois || [],
+      frame: built.frame || null,     // optional hero-framing hint for the dive-in
       worldPos: new THREE.Vector3(pad.x, pad.y, pad.z),
     });
   }
