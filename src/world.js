@@ -14,6 +14,8 @@ import { buildTrees } from './bricks/trees.js';
 import { buildRocks } from './bricks/rocks.js';
 import { buildVolcano } from './bricks/volcano.js';
 import { buildClouds } from './bricks/clouds.js';
+import { buildFlying } from './bricks/flying.js';
+import { ACTIVE } from './themes.js';
 import { smoothstep, mulberry32 } from './gen/noise.js';
 import { CITIES } from './cities/registry.js';
 import { placeCities } from './cities/placement.js';
@@ -141,9 +143,17 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   group.add(sea.mesh);
   updaters.push((t) => sea.update(t));
 
+  // 13. FLYING-ISLAND rig (underside rock + cloud sea) — built hidden; the flying
+  // theme shows it and hides the ocean. See bricks/flying.js.
+  const flying = buildFlying(field, cfg.half, seed);
+  group.add(flying.group);
+  updaters.push((t) => flying.update(t));
+
   // re-apply the active theme to this world's baked meshes (vertex colours, water)
-  // without rebuilding geometry — called on a live theme switch.
-  const restyle = () => { terrain.restyle(); sea.restyle(); };
+  // and toggle the flying rig / ocean — without rebuilding geometry.
+  const applyFlying = () => { flying.setVisible(ACTIVE.flying); sea.mesh.visible = !ACTIVE.flying; };
+  const restyle = () => { terrain.restyle(); sea.restyle(); applyFlying(); };
+  applyFlying();   // initial state (matches the theme set before build)
 
   return { group, updaters, cities, field, graph, hydro, slope, scatter, scenicAzimuth, restyle };
 }
