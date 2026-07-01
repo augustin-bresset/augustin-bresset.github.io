@@ -21,42 +21,63 @@ export function buildTerrainMesh(field) {
   const pA = new THREE.Vector3(), pB = new THREE.Vector3(), pC = new THREE.Vector3();
   const ab = new THREE.Vector3(), ac = new THREE.Vector3(), nrm = new THREE.Vector3();
   const col = new THREE.Color();
-  let o = 0;
 
+  // (re)write the vertex COLOUR buffer from the current theme palette — positions are
+  // computed once, but colours are recomputed on a theme switch (buildTerrainMesh's
+  // faceColor reads the active theme), so no geometry rebuild is needed.
+  const writeColors = () => {
+    let o = 0;
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const y00 = heights[idx(i, j)], y10 = heights[idx(i + 1, j)];
+        const y01 = heights[idx(i, j + 1)], y11 = heights[idx(i + 1, j + 1)];
+        const b00 = biome[idx(i, j)];
+        const x0 = gx(i), x1 = gx(i + 1), z0 = gz(j), z1 = gz(j + 1);
+        const tris = [
+          [x0, y00, z0, x0, y01, z1, x1, y10, z0],
+          [x1, y10, z0, x0, y01, z1, x1, y11, z1],
+        ];
+        for (let ti = 0; ti < 2; ti++) {
+          const [ax, ay, az, bx, by, bz, cx, cy, cz] = tris[ti];
+          pA.set(ax, ay, az); pB.set(bx, by, bz); pC.set(cx, cy, cz);
+          ab.subVectors(pB, pA); ac.subVectors(pC, pA);
+          nrm.crossVectors(ab, ac).normalize();
+          const slope = 1 - clamp(nrm.y, 0, 1);
+          const my = (ay + by + cy) / 3;
+          const jit = (hash2(i * 2 + ti, j) - 0.5) * 0.05;
+          faceColor(col, b00, my, slope, jit);
+          for (let v = 0; v < 3; v++) {
+            colors[o + v * 3] = col.r;
+            colors[o + v * 3 + 1] = col.g;
+            colors[o + v * 3 + 2] = col.b;
+          }
+          o += 9;
+        }
+      }
+    }
+  };
+
+  // positions (once)
+  let o = 0;
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
-      const x0 = gx(i), x1 = gx(i + 1);
-      const z0 = gz(j), z1 = gz(j + 1);
+      const x0 = gx(i), x1 = gx(i + 1), z0 = gz(j), z1 = gz(j + 1);
       const y00 = heights[idx(i, j)], y10 = heights[idx(i + 1, j)];
       const y01 = heights[idx(i, j + 1)], y11 = heights[idx(i + 1, j + 1)];
-      const b00 = biome[idx(i, j)];
-
-      // CCW winding so face normals point up (+Y).
       const tris = [
         [x0, y00, z0, x0, y01, z1, x1, y10, z0],
         [x1, y10, z0, x0, y01, z1, x1, y11, z1],
       ];
       for (let ti = 0; ti < 2; ti++) {
         const [ax, ay, az, bx, by, bz, cx, cy, cz] = tris[ti];
-        pA.set(ax, ay, az); pB.set(bx, by, bz); pC.set(cx, cy, cz);
-        ab.subVectors(pB, pA); ac.subVectors(pC, pA);
-        nrm.crossVectors(ab, ac).normalize();
-        const slope = 1 - clamp(nrm.y, 0, 1);
-        const my = (ay + by + cy) / 3;
-        const jit = (hash2(i * 2 + ti, j) - 0.5) * 0.05;
-        faceColor(col, b00, my, slope, jit);
         positions[o] = ax; positions[o + 1] = ay; positions[o + 2] = az;
         positions[o + 3] = bx; positions[o + 4] = by; positions[o + 5] = bz;
         positions[o + 6] = cx; positions[o + 7] = cy; positions[o + 8] = cz;
-        for (let v = 0; v < 3; v++) {
-          colors[o + v * 3] = col.r;
-          colors[o + v * 3 + 1] = col.g;
-          colors[o + v * 3 + 2] = col.b;
-        }
         o += 9;
       }
     }
   }
+  writeColors();
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -70,5 +91,9 @@ export function buildTerrainMesh(field) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.name = 'terrain';
-  return mesh;
+  return {
+    mesh,
+    // recolour to the current theme without touching geometry
+    restyle() { writeColors(); geo.attributes.color.needsUpdate = true; },
+  };
 }

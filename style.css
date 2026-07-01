@@ -116,13 +116,31 @@ html, body {
   border-color: rgba(44, 26, 14, 0.55);
 }
 
+.ui-btn--theme {
+  margin-left: auto;               /* push the theme + lang pair to the right */
+  font-family: 'Caveat', cursive;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.45rem 0.85rem;
+}
+
 .ui-btn--lang {
-  margin-left: auto;
+  margin-left: 0;
   font-family: 'Caveat', cursive;
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   padding: 0.45rem 0.8rem;
+}
+
+/* ── Sketch / croquis theme: heavier paper tooth + graphite grain, lighter
+   vignette so the page reads like a pencil sketchbook leaf. ─────────────── */
+body.theme-sketch #paper { opacity: 0.82; background-size: 430px 430px; }
+body.theme-sketch #grain { opacity: 0.2; }
+body.theme-sketch #vignette {
+  background: radial-gradient(ellipse 82% 82% at 50% 45%,
+    rgba(80, 70, 52, 0) 60%, rgba(96, 84, 62, 0.13) 100%);
 }
 
 /* ── Hint ─────────────────────────────────────────────────── */

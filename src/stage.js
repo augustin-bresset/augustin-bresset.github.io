@@ -1,15 +1,16 @@
 // stage.js — renderer, scene, lights, sky, fog, render loop.
 // The "stage" is the reusable 3D environment everything is placed into.
 import * as THREE from 'three';
+import { ACTIVE } from './themes.js';
 
-function makeSkyTexture() {
+function makeSkyTexture(stops = ['#d7cab2', '#e6dcc7', '#efe6d4']) {
   const c = document.createElement('canvas');
   c.width = 4; c.height = 256;
   const g = c.getContext('2d');
   const grad = g.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0.0, '#d7cab2'); // zenith
-  grad.addColorStop(0.55, '#e6dcc7');
-  grad.addColorStop(1.0, '#efe6d4'); // horizon, pale
+  grad.addColorStop(0.0, stops[0]); // zenith
+  grad.addColorStop(0.55, stops[1]);
+  grad.addColorStop(1.0, stops[2]); // horizon, pale
   g.fillStyle = grad;
   g.fillRect(0, 0, 4, 256);
   const tex = new THREE.CanvasTexture(c);
@@ -29,29 +30,27 @@ export function createStage(container) {
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.98;
+  renderer.toneMappingExposure = ACTIVE.exposure;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
 
-  // Soft vertical sky gradient (deeper warm above, pale near the horizon) so the
-  // sea fades seamlessly into the sky. Fog colour matches the horizon band.
-  const HORIZON = new THREE.Color('#ece3d0');
-  scene.background = makeSkyTexture();
-  // fog closes the distance so the big terrain fades to the horizon haze well before
-  // its far square edge — the edge sits past `far` and is never visible.
-  scene.fog = new THREE.Fog(HORIZON.getHex(), 560, 1400);
+  // Soft vertical sky gradient + fog matching the horizon band, both from the active
+  // theme so a theme switch restyles the whole atmosphere (see applyTheme below).
+  scene.background = makeSkyTexture(ACTIVE.sky);
+  scene.fog = new THREE.Fog(new THREE.Color(ACTIVE.fog).getHex(), ACTIVE.fogNear, ACTIVE.fogFar);
 
   // Lighting: a soft warm key (sun) + cool sky fill (hemisphere) for gentle
   // form-reading shadows without harsh contrast — reads like watercolor light.
-  const hemi = new THREE.HemisphereLight(0xfdf6e6, 0x7a6a50, 0.78);
+  const hemi = new THREE.HemisphereLight(
+    new THREE.Color(ACTIVE.hemiSky), new THREE.Color(ACTIVE.hemiGround), ACTIVE.hemiInt);
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xfff1d6, 1.12);
+  const sun = new THREE.DirectionalLight(new THREE.Color(ACTIVE.sunColor), ACTIVE.sunInt);
   sun.position.set(-520, 720, 420);
-  sun.castShadow = true;
+  sun.castShadow = ACTIVE.sunShadow;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 80;
   sun.shadow.camera.far = 2400;
@@ -66,7 +65,21 @@ export function createStage(container) {
   scene.add(sun.target);
 
   // A faint warm ambient so deep shadows never go fully black (ink, not void).
-  scene.add(new THREE.AmbientLight(0x5a4a36, 0.42));
+  const ambient = new THREE.AmbientLight(new THREE.Color(ACTIVE.ambient), ACTIVE.ambientInt);
+  scene.add(ambient);
+
+  // Re-apply the active theme's atmosphere in place (called on a live theme switch).
+  function applyTheme() {
+    renderer.toneMappingExposure = ACTIVE.exposure;
+    scene.background = makeSkyTexture(ACTIVE.sky);
+    scene.fog.color.set(ACTIVE.fog);
+    scene.fog.near = ACTIVE.fogNear; scene.fog.far = ACTIVE.fogFar;
+    hemi.color.set(ACTIVE.hemiSky); hemi.groundColor.set(ACTIVE.hemiGround);
+    hemi.intensity = ACTIVE.hemiInt;
+    sun.color.set(ACTIVE.sunColor); sun.intensity = ACTIVE.sunInt;
+    sun.castShadow = ACTIVE.sunShadow;
+    ambient.color.set(ACTIVE.ambient); ambient.intensity = ACTIVE.ambientInt;
+  }
 
   const clock = new THREE.Clock();
   const updaters = new Set();
@@ -102,7 +115,7 @@ export function createStage(container) {
   function stop() { running = false; }
 
   return {
-    renderer, scene, sun, hemi, clock,
+    renderer, scene, sun, hemi, clock, applyTheme,
     setCamera, onFrame, resize, start, stop, setRenderHook,
     get camera() { return camera; },
   };

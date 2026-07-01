@@ -10,6 +10,7 @@ export class UI {
     this.cardBody = document.getElementById('note-body');
     this.backBtn = document.getElementById('back-btn');
     this.langBtn = document.getElementById('lang-btn');
+    this.themeBtn = document.getElementById('theme-btn');
     this.hint = document.getElementById('hint');
     this.legend = document.getElementById('legend');
     this.activeNote = null;     // { cityId, poiId, accent }

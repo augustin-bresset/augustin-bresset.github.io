@@ -7,6 +7,7 @@
 //   - scatter + city hints
 import * as THREE from 'three';
 import { clamp } from './noise.js';
+import { ACTIVE } from '../themes.js';
 
 export const BIOME = {
   OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, HILLS: 4,
@@ -97,9 +98,9 @@ export function faceColor(out, biomeId, y, slope, jitter = 0) {
   if (y > 60) out.lerp(_c.set('#e6e1d4'), clamp((y - 60) / 18, 0, 0.8));
   // subtle facet jitter
   if (jitter) out.offsetHSL(0, 0, jitter);
-  // desaturate toward paper (the "brouillon" muting) — a little stronger so the
-  // whole map reads like a faded pencil-and-wash sketch rather than a vivid render
-  out.lerp(_paper, 0.17);
+  // desaturate toward the active theme's paper tone (the "brouillon" muting) — the
+  // sketch theme pushes this much stronger for a pale pencil-and-wash look.
+  out.lerp(_paper.set(ACTIVE.paperTone), ACTIVE.paperLerp);
   return out;
 }
 
