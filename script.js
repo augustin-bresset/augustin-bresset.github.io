@@ -29,9 +29,10 @@ if (!webglOK()) {
 function boot() {
   const qp = new URLSearchParams(location.search);
 
-  // initial visual THEME (?theme=sketch) — set BEFORE the stage/world are built so
-  // their materials, lights and baked colours pick it up. Live-switchable below.
-  setTheme(qp.get('theme') === 'sketch' ? 'sketch' : 'diorama');
+  // initial visual THEME (?theme=sketch|floating) — set BEFORE the stage/world are
+  // built so their materials, lights and baked colours pick it up. setTheme falls back
+  // to diorama for a missing/unknown key. Live-switchable below.
+  setTheme(qp.get('theme'));
 
   const stage = createStage(container);
 
@@ -61,6 +62,25 @@ function boot() {
     rig.apply();
   }
   stage.setCamera(rig.camera);
+
+  // dev camera override (only fires when a param is present): ?pol=&rad=&az=&tx=&tz=&ty=
+  // lets a headless shot frame any angle past the runtime clamp (e.g. up at the
+  // flying underside). Inert in normal use — no param, no effect.
+  {
+    const num = (k) => (qp.has(k) ? parseFloat(qp.get(k)) : null);
+    const D2R = Math.PI / 180;
+    const pol = num('pol'), rad = num('rad'), az = num('az');
+    const tx = num('tx'), tz = num('tz'), ty = num('ty');
+    if (pol != null) rig.polar = rig._pol = pol * D2R;
+    if (rad != null) rig.radius = rig._rad = rad;
+    if (az != null) rig.azimuth = rig._azim = rig.home.azimuth = az * D2R;
+    if (tx != null) { rig.target.x = tx; rig._tgt.x = tx; }
+    if (tz != null) { rig.target.z = tz; rig._tgt.z = tz; }
+    if (ty != null) { rig.target.y = ty; rig._tgt.y = ty; }
+    if (pol != null || rad != null || az != null || tx != null || tz != null || ty != null) {
+      rig.idleDrift = false; rig.apply();
+    }
+  }
 
   const ui = new UI();
   const nav = new Navigation(stage, rig, world, ui);

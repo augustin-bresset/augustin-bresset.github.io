@@ -19,6 +19,7 @@ export const THEMES = {
     water: '#3f7e96', waterFloor: '#244e5e', waterOpacity: 0.9,
     outline: false, outlineStrength: 0.0, ink: '#2a1808',
     desat: 0, wash: 0, washTone: '#efe9db',
+    flying: false,
     bodyClass: '',
   },
   // a pale pencil-and-wash CROQUIS: washed-out colours, soft flat light, ink edges,
@@ -35,11 +36,29 @@ export const THEMES = {
     water: '#b4c6c9', waterFloor: '#9fb2b4', waterOpacity: 0.82,
     outline: true, outlineStrength: 0.9, ink: '#4a4034',        // pencil, not harsh black
     desat: 0.55, wash: 0.16, washTone: '#efe9db',              // whole-frame croquis wash
+    flying: false,
     bodyClass: 'theme-sketch',
+  },
+  // a FLYING ISLAND adrift in a blue sky: the ocean is hidden, the island floats
+  // above a cloud sea on a jagged rock underside (see bricks/flying.js).
+  floating: {
+    key: 'floating', name: 'Île volante', label: '☁',
+    sky: ['#5c93bf', '#8fbcd8', '#c6dcea'],   // blue sky → pale at the horizon
+    fog: '#c3dae7', fogNear: 520, fogFar: 1350,
+    hemiSky: '#eaf3fb', hemiGround: '#9caf9e', hemiInt: 0.95,
+    sunColor: '#fff6e2', sunInt: 1.05, sunShadow: true,
+    ambient: '#6c7d88', ambientInt: 0.5,
+    exposure: 1.03,
+    paperLerp: 0.14, paperTone: '#c9c2ad',    // keep the land fairly natural
+    water: '#7fb3cf', waterFloor: '#4d7f93', waterOpacity: 0.9,
+    outline: false, outlineStrength: 0.0, ink: '#2a1808',
+    desat: 0, wash: 0, washTone: '#efe9db',
+    flying: true,
+    bodyClass: '',
   },
 };
 
-export const THEME_ORDER = ['diorama', 'sketch'];
+export const THEME_ORDER = ['diorama', 'sketch', 'floating'];
 
 // the live active theme — mutated in place by setTheme so holders stay in sync
 export const ACTIVE = { ...THEMES.diorama };
