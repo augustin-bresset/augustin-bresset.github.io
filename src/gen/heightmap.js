@@ -9,7 +9,7 @@ import { BIOME, BIOMES } from './biomes.js';
 export const WATER_Y = 0;
 
 // per-biome moisture target (drives scatter + river-bank life)
-const MOIST = [0.9, 0.5, 0.45, 0.75, 0.4, 0.3, 0.25, 0.08, 0.2, 0.85, 0.1];
+const MOIST = [0.9, 0.5, 0.45, 0.75, 0.4, 0.3, 0.25, 0.08, 0.2, 0.85, 0.1, 0.05];
 
 export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, graph) {
   const half = size / 2;
@@ -60,6 +60,16 @@ export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, 
       const smooth = n * amp;
       const ridge = rg * amp;
       let y = base + lerp(smooth, ridge, ridged);
+
+      // plateau: only applied when the nearest biome declares one. Crushes everything
+      // above the cap to 6% of its overshoot — flat top, sheer cliff sides — without
+      // bleeding into neighbouring biomes (we use bId, not the blended params, so the
+      // cliff edge follows the Voronoi boundary rather than a blurred gradient).
+      const platH = BIOMES[bId].height.plateau || 0;
+      if (platH > 0) {
+        const excess = Math.max(0, y - platH);
+        y = platH + excess * 0.06;
+      }
 
       if (mode === 'island') {
         // ISLAND: the coastline IS the Voronoi land/sea cell boundary (ocean-biome

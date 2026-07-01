@@ -11,7 +11,7 @@ import { ACTIVE } from '../themes.js';
 
 export const BIOME = {
   OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, HILLS: 4,
-  MOUNTAIN: 5, SNOW: 6, DESERT: 7, SAVANNA: 8, MARSH: 9, VOLCANIC: 10,
+  MOUNTAIN: 5, SNOW: 6, DESERT: 7, SAVANNA: 8, MARSH: 9, VOLCANIC: 10, MESA: 11,
 };
 
 // height: { base, amp, ridged(0..1), freq }  — blended across biome borders.
@@ -46,6 +46,12 @@ export const BIOMES = [
   // settle right beside it.
   { id: 10, key: 'volcanic', name: 'Volcanic', color: '#3a342f', height: { base: 5, amp: 5, ridged: 0, freq: 0.02 }, weight: 0.0, scatter: 'rock',
     adj: { volcanic: 2, desert: 3, savanna: 3, plains: 2 } },
+  // Mesa: flat-topped sandstone tablelands. High amplitude noise is crushed by the
+  // plateau cap in heightmap.js → sheer cliffs top-out at a flat terracotta summit.
+  // Sits naturally between desert/savanna lowlands (it's a desert feature) and never
+  // touches mountains or snow.
+  { id: 11, key: 'mesa', name: 'Mesa', color: '#c47a52', height: { base: 12, amp: 40, ridged: 0.45, freq: 0.014, plateau: 30 }, weight: 0.28, scatter: 'rock',
+    adj: { mesa: 3, desert: 5, savanna: 4, plains: 2, hills: 1 } },
 ];
 
 export const BY_KEY = Object.fromEntries(BIOMES.map((b) => [b.key, b]));

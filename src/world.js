@@ -15,6 +15,7 @@ import { buildRocks } from './bricks/rocks.js';
 import { buildVolcano } from './bricks/volcano.js';
 import { buildClouds } from './bricks/clouds.js';
 import { buildFlying } from './bricks/flying.js';
+import { buildBridges } from './bricks/bridges.js';
 import { smoothstep, mulberry32 } from './gen/noise.js';
 import { buildIslandField } from './gen/islands.js';
 import { ACTIVE } from './themes.js';
@@ -200,6 +201,10 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
     flying.setVisible(true);
     sea.mesh.visible = false;        // no ocean under a floating island
     updaters.push((t) => flying.update(t));
+
+    // Wooden rope bridges between islands close enough to connect.
+    const bridges = buildBridges(field, islandField, seed);
+    group.add(bridges);
   }
 
   // re-apply the active AMBIANCE to this world's baked meshes (vertex colours,

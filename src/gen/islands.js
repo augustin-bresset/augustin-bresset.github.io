@@ -27,12 +27,26 @@ export function buildIslandField(field, anchors, seed) {
       const d = Math.hypot(anchors[j].x - a.x, anchors[j].z - a.z);
       if (d < nn) nn = d;
     }
-    const R = Math.max(120, Math.min(250, (isFinite(nn) ? nn : 320) * 0.66));
-    const s = (seed ^ (0x9e37 * (i + 1))) >>> 0;
+    // Randomise the radius factor per island (0.50…0.86) so islands aren't all the
+    // same proportional size relative to their city spacing.
+    const s  = (seed ^ (0x9e37 * (i + 1))) >>> 0;
+    const s2 = (seed ^ (0xb1c7 * (i + 5))) >>> 0;
+    const rFactor = 0.50 + ((s >> 20) % 100) / 270; // 0.50..0.87
+    const R = Math.max(110, Math.min(280, (isFinite(nn) ? nn : 320) * rFactor));
     return {
       x: a.x, z: a.z, R,
-      k1: 2 + (s % 3), p1: ((s >> 3) % 628) / 100,
-      k2: 3 + ((s >> 6) % 3), p2: ((s >> 9) % 628) / 100,
+      // Four harmonic lobes with per-island frequencies, phases, and amplitudes so
+      // every island has a unique silhouette — some nearly circular, others crenellated
+      // or lopsided. Lower harmonics (k1,k2) set the large-scale shape; higher ones
+      // (k3,k4) add fine jaggedness at the coastline.
+      k1: 2 + (s % 3),          p1: ((s  >>  3) % 628) / 100,
+      a1: 0.12 + ((s >> 6) % 100) / 480,   // 0.12..0.33
+      k2: 3 + ((s >> 9) % 3),    p2: ((s  >> 12) % 628) / 100,
+      a2: 0.06 + ((s >> 15) % 80) / 850,   // 0.06..0.15
+      k3: 5 + (s2 % 4),          p3: ((s2 >>  4) % 628) / 100,
+      a3: 0.03 + ((s2 >> 8) % 60) / 2200,  // 0.03..0.06
+      k4: 7 + ((s2 >> 12) % 4),  p4: ((s2 >> 16) % 628) / 100,
+      a4: 0.015 + ((s2 >> 20) % 40) / 4500, // 0.015..0.024
     };
   });
 
@@ -43,7 +57,11 @@ export function buildIslandField(field, anchors, seed) {
       const dx = x - a.x, dz = z - a.z;
       const d = Math.hypot(dx, dz);
       const th = Math.atan2(dz, dx);
-      const wob = 1 + 0.17 * Math.sin(a.k1 * th + a.p1) + 0.10 * Math.sin(a.k2 * th + a.p2);
+      const wob = 1
+        + a.a1 * Math.sin(a.k1 * th + a.p1)
+        + a.a2 * Math.sin(a.k2 * th + a.p2)
+        + a.a3 * Math.sin(a.k3 * th + a.p3)
+        + a.a4 * Math.sin(a.k4 * th + a.p4);
       const R = a.R * wob;
       const fi = smoothstep(R, R * 0.6, d);     // note edge0>edge1: 1 inside, 0 out
       if (fi > f) f = fi;
