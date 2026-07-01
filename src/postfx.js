@@ -70,6 +70,7 @@ export function createOutline(renderer, scene, getCamera, container) {
 
   return {
     setStrength(s) { mat.uniforms.uStrength.value = s; },
+    setInk(c) { mat.uniforms.uInk.value.set(c); },
     render() {
       const cam = getCamera();
       mat.uniforms.uNear.value = cam.near;

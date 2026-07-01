@@ -89,8 +89,9 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   const slope = computeSlope(field);
   const scatter = planScatter(field, slope, hydro, seed, exclusions);
 
-  // 6. terrain mesh (the big grid — its edge is far past the fog + the camera clamp)
-  group.add(buildTerrainMesh(field));
+  // 6. terrain mesh (its edge is far past the fog + the camera clamp)
+  const terrain = buildTerrainMesh(field);
+  group.add(terrain.mesh);
 
   // 6b. scenic orientation: face the home camera toward the tallest distant terrain
   // (a natural mountain mass) so there are real mountains on the horizon ahead — no
@@ -134,12 +135,17 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   group.add(clouds.group);
   updaters.push((t, dt) => clouds.update(t, dt));
 
-  // 12. sea (covers the surrounding ocean + the horizon; segments capped in water.js)
-  const sea = buildSea(cfg.size);
+  // 12. sea — flat across the island (its lakes), swelling to waves only out in the
+  // open sea toward the horizon. (segments capped in water.js)
+  const sea = buildSea(cfg.size, { calmR: cfg.half * 0.85, waveR: cfg.half * 1.3 });
   group.add(sea.mesh);
   updaters.push((t) => sea.update(t));
 
-  return { group, updaters, cities, field, graph, hydro, slope, scatter, scenicAzimuth };
+  // re-apply the active theme to this world's baked meshes (vertex colours, water)
+  // without rebuilding geometry — called on a live theme switch.
+  const restyle = () => { terrain.restyle(); sea.restyle(); };
+
+  return { group, updaters, cities, field, graph, hydro, slope, scatter, scenicAzimuth, restyle };
 }
 
 // Angle (world XZ) of the tallest distant terrain — sampled on a mid-far ring that

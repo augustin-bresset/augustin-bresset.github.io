@@ -7,6 +7,7 @@ import { UI } from './src/ui.js';
 import { Navigation } from './src/navigation.js';
 import { LANG, cityLabel } from './src/lang.js';
 import { createOutline } from './src/postfx.js';
+import { ACTIVE, setTheme, nextThemeKey } from './src/themes.js';
 
 const container = document.getElementById('viewport');
 
@@ -27,6 +28,11 @@ if (!webglOK()) {
 
 function boot() {
   const qp = new URLSearchParams(location.search);
+
+  // initial visual THEME (?theme=sketch) — set BEFORE the stage/world are built so
+  // their materials, lights and baked colours pick it up. Live-switchable below.
+  setTheme(qp.get('theme') === 'sketch' ? 'sketch' : 'diorama');
+
   const stage = createStage(container);
 
   const urlSeed = qp.get('seed');
@@ -61,13 +67,29 @@ function boot() {
   document.getElementById('note-close').addEventListener('click', () => nav.closeNote());
   ui.buildLegend(world.cities, (id) => nav.diveTo(id));
 
-  // experimental ink outline — opt-in (?outline=1). The painterly grain+vignette
-  // overlay is the default look; depth-outline gets busy in dense foliage.
-  if (qp.get('outline') === '1') {
-    const outline = createOutline(stage.renderer, stage.scene, () => rig.camera, container);
-    if (qp.has('ostr')) outline.setStrength(+qp.get('ostr'));
-    stage.setRenderHook(() => outline.render());
-  }
+  // Ink outline pass (pencil edges) — active only in themes that ask for it (sketch).
+  // The render hook always runs; it inks when the theme wants it, else renders plainly.
+  const outline = createOutline(stage.renderer, stage.scene, () => rig.camera, container);
+  const syncOutline = () => { outline.setStrength(ACTIVE.outlineStrength); outline.setInk(ACTIVE.ink); };
+  syncOutline();
+  stage.setRenderHook(() => {
+    if (ACTIVE.outline) outline.render();
+    else stage.renderer.render(stage.scene, rig.camera);
+  });
+
+  // live THEME switcher: restyle the atmosphere + baked meshes in place (no rebuild)
+  const applyThemeUI = () => {
+    document.body.classList.toggle('theme-sketch', ACTIVE.key === 'sketch');
+    if (ui.themeBtn) ui.themeBtn.textContent = ACTIVE.name;
+    syncOutline();
+  };
+  applyThemeUI();
+  if (ui.themeBtn) ui.themeBtn.addEventListener('click', () => {
+    setTheme(nextThemeKey(ACTIVE.key));
+    stage.applyTheme();
+    world.restyle();
+    applyThemeUI();
+  });
 
   // language toggle: button + city labels + panel + hint
   applyCityLabels(world);
