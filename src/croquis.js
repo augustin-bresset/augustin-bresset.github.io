@@ -222,11 +222,23 @@ export function buildCroquis(stage, container, seed) {
   _fwd.set(0, 0, -1); _right.set(1, 0, 0); _u.set(0, 1, 0);
   seedField();
 
-  const dist2 = SPAWN * 1.35, dist2sq = dist2 * dist2;
+  const dist2 = SPAWN * 1.55, dist2sq = dist2 * dist2;   // recycle envelope (> any spawn radius)
 
   return {
     group, camera, isCroquis: true,
     update(t, dt) {
+      // ---------- origin rebase FIRST (infinite-flight precision): shift the whole
+      // pool + pos before the camera/ships are placed from them this frame, so camera
+      // and world stay in one frame of reference (no one-frame cloudscape flash).
+      if (pos.lengthSq() > 6000 * 6000) {
+        const shift = pos.clone();          // NOT a shared temp — rebuildCluster uses _v
+        pos.sub(shift);
+        for (const cl of clusters) { cl.base.sub(shift); rebuildCluster(cl); }
+        for (const tw of towers) { tw.base.sub(shift); tw.group.position.copy(tw.base); }
+        for (const sh of ships) { sh.base.sub(shift); }
+        field.instanceMatrix.needsUpdate = true;
+      }
+
       // ---------- flight ----------
       const k = 1 - Math.pow(0.0001, dt);                 // critically-damped, floaty
       const targetYawRate = reduceMotion ? 0 : -px * 0.5;
@@ -252,24 +264,24 @@ export function buildCroquis(stage, container, seed) {
       let dirty = false, inCloud = false;
       for (const cl of clusters) {
         _d.subVectors(cl.base, camPos);
-        const along = _d.dot(_fwd);
+        let along = _d.dot(_fwd);
         if (along < -BEHIND || _d.lengthSq() > dist2sq) {
           scatter(cl.base, camPos, SPAWN - 40, 120, 360, CORRIDOR_Y);
-          rebuildCluster(cl); dirty = true;
+          rebuildCluster(cl); dirty = true; along = SPAWN;   // fresh spawn = far = faint
         }
         const finish = smoothstep(820, 240, along);
         cl.sprite.material.opacity = (cl.outlineOnly ? 0.0 : 0.10) + finish * (cl.outlineOnly ? 0.55 : 0.78);
         if (_d.lengthSq() < cl.radius * cl.radius) inCloud = true;
       }
-      if (dirty) { field.instanceMatrix.needsUpdate = true; if (field.instanceColor) field.instanceColor.needsUpdate = true; }
+      if (dirty) field.instanceMatrix.needsUpdate = true;   // colours never change on recycle
 
       // ---------- recycle: hero towers ----------
       for (const tw of towers) {
         _d.subVectors(tw.base, camPos);
-        const along = _d.dot(_fwd);
+        let along = _d.dot(_fwd);
         if (along < -BEHIND * 1.4 || _d.lengthSq() > dist2sq) {
-          scatter(tw.base, camPos, SPAWN - 20, 140, 480, [-120, 60]);
-          tw.group.position.copy(tw.base);
+          scatter(tw.base, camPos, SPAWN - 20, 140, 460, [-120, 60]);
+          tw.group.position.copy(tw.base); along = SPAWN;
         }
         tw.sprite.material.opacity = 0.25 + smoothstep(900, 300, along) * 0.6;
         if (_d.lengthSq() < tw.radius * tw.radius) inCloud = true;
@@ -295,16 +307,6 @@ export function buildCroquis(stage, container, seed) {
       veilOp += ((inCloud ? 0.62 : 0) - veilOp) * Math.min(1, dt * 3);
       veil.material.opacity = veilOp;
       veil.position.copy(camPos).addScaledVector(_fwd, 3.2);
-
-      // ---------- origin rebase (infinite-flight precision) ----------
-      if (pos.lengthSq() > 6000 * 6000) {
-        const shift = pos.clone();          // NOT a shared temp — rebuildCluster uses _v
-        pos.sub(shift);
-        for (const cl of clusters) { cl.base.sub(shift); rebuildCluster(cl); }
-        for (const tw of towers) { tw.base.sub(shift); tw.group.position.copy(tw.base); }
-        for (const sh of ships) { sh.base.sub(shift); }
-        field.instanceMatrix.needsUpdate = true;
-      }
     },
     resize() {
       camera.aspect = container.clientWidth / container.clientHeight;
@@ -388,12 +390,16 @@ function invertedHull(geo, push, seed, colorHex) {
 // =====================================================================
 // airships (fill Lambert + inverted-hull contour + line detail)
 // =====================================================================
+// wrap a fill mesh + its inverted-hull graphite contour in one node, so a caller that
+// offsets the returned node moves BOTH (a bare fill would leave its outline behind).
 function outlined(geo, fillMat, push, seed, g) {
+  const node = new THREE.Group();
   const fill = new THREE.Mesh(geo, fillMat);
   fill.scale.setScalar(0.997);          // sit just under the shell (no z-fight)
-  g.add(fill);
-  g.add(invertedHull(geo, push, seed, GRAPHITE));
-  return fill;
+  node.add(fill);
+  node.add(invertedHull(geo, push, seed, GRAPHITE));
+  g.add(node);
+  return node;
 }
 function makeDirigible(rng) {
   const g = new THREE.Group();

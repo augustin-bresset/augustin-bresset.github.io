@@ -144,7 +144,7 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // 6b. scenic orientation: face the home camera toward the tallest distant terrain
   // (a natural mountain mass) so there are real mountains on the horizon ahead — no
   // bolted-on backdrop, just the generated range, sitting where the camera looks.
-  const scenicAzimuth = scenicDirection(field, cfg.half) - Math.PI;
+  const scenicAzimuth = scenicDirection(field, cfg.half, islandField) - Math.PI;
 
   // 7. rivers
   const rivers = buildRivers(hydro, field);
@@ -275,13 +275,19 @@ function clipLinesToIslands(lines, islandField, minLen) {
 // Angle (world XZ) of the tallest distant terrain — sampled on a mid-far ring that
 // sits inside the visible (pre-fog) range, so the home view always opens onto the
 // generated mountains rather than flat plains.
-function scenicDirection(field, half) {
+function scenicDirection(field, half, islandField) {
   const STEPS = 60, radii = [0.46 * half, 0.62 * half, 0.80 * half];
   let bestTh = 0, bestH = -Infinity;
   for (let a = 0; a < STEPS; a++) {
     const th = (a / STEPS) * Math.PI * 2;
     let h = 0;
-    for (const r of radii) h += field.heightAt(Math.cos(th) * r, Math.sin(th) * r);
+    for (const r of radii) {
+      const x = Math.cos(th) * r, z = Math.sin(th) * r;
+      // in the archipelago, don't aim the home view at sky the mask carved away —
+      // only count directions that still have island land at the sampled ring points.
+      if (islandField && !islandField.atWorld(x, z)) continue;
+      h += field.heightAt(x, z);
+    }
     if (h > bestH) { bestH = h; bestTh = th; }
   }
   return bestTh;
