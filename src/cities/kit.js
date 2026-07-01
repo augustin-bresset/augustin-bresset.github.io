@@ -2,6 +2,7 @@
 // Small helpers so each city module stays focused on its own identity.
 import * as THREE from 'three';
 import { ACTIVE } from '../themes.js';
+import { portalRender } from '../portalRender.js';
 
 export function box(w, h, d, color, opts = {}) {
   const geo = new THREE.BoxGeometry(w, h, d);
@@ -102,63 +103,128 @@ export function pointCloud(clusters, { size = 0.16 } = {}) {
   return g;
 }
 
-// The PORTAL: a holographic mini-diorama of the whole world on a pedestal. Clicking
-// it flies the camera back to the overview map. Every mesh is tagged portal:true so
-// navigation can pick it. Returns { group, update } — fold update into the city's.
+// The PORTAL: a window into non-Euclidean space, mounted on a pedestal. The surface
+// is a live bird's-eye render of the whole world — you look down through the disc and
+// see the same world from the sky above (Klein-bottle topology: falling through the
+// portal brings you back to where you came from). Clicking returns to the overview.
+// Every mesh is tagged portal:true so navigation can pick it.
+// Returns { group, update } — fold update into the city's.
 export function makePortal(accent = '#e9dcc0') {
   const g = new THREE.Group();
   const ac = new THREE.Color(accent);
 
-  // pedestal
+  // pedestal — dark metal column
   g.add(cyl(2.4, 3.0, 3, 0x26262c, 16, { pos: [0, 1.5, 0], roughness: 0.7, metalness: 0.35 }));
-  // glowing base disc (the "sea")
-  const disc = new THREE.Mesh(
-    new THREE.CylinderGeometry(4.3, 4.3, 0.5, 36),
-    new THREE.MeshStandardMaterial({ color: 0x0e151b, emissive: 0x12303a, emissiveIntensity: 0.5, roughness: 0.35 }));
-  disc.position.y = 3.2; disc.receiveShadow = true; g.add(disc);
 
-  // mini continent: a cluster of little flat-shaded bumps
-  const land = new THREE.Group(); land.position.y = 3.45; g.add(land);
-  const bumpMat = new THREE.MeshStandardMaterial({ color: 0x93a072, flatShading: true, roughness: 1 });
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x8c8678, flatShading: true, roughness: 1 });
-  const r = rng(7771);
-  for (let i = 0; i < 18; i++) {
-    const a = r() * 6.28, rr = Math.pow(r(), 0.7) * 3.1;
-    const h = 0.35 + r() * 1.6;
-    const c = new THREE.Mesh(new THREE.ConeGeometry(0.55 + r() * 0.8, h, 6),
-      h > 1.3 ? rockMat : bumpMat);
-    c.position.set(Math.cos(a) * rr, h / 2, Math.sin(a) * rr);
-    c.rotation.y = r() * 6.28; c.castShadow = false;
-    land.add(c);
-  }
-  // tiny glowing city pins (echo the four project colours)
-  for (const [mx, mz, col] of [[1.6, 0.4, 0xe10600], [-1.1, 1.3, 0x00b8d9],
-    [0.6, -1.7, 0xdda42a], [-1.7, -0.7, 0xc4763a]]) {
-    const pin = box(0.16, 0.9, 0.16, col,
-      { pos: [mx, 0.5, mz], emissive: col, emissiveIntensity: 2.4, cast: false, receive: false });
-    land.add(pin);
-  }
+  // Portal surface: a flat disc showing the live top-down world render.
+  // Wrapped in a group so spinning the view is a clean Y-axis rotation on the group,
+  // independent of the disc's own X-tilt that makes it face up.
+  const discGroup = new THREE.Group();
+  discGroup.position.y = 3.35;
+  const portalDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(4.0, 72),
+    makePortalWindowMaterial()
+  );
+  portalDisc.rotation.x = -Math.PI / 2;  // flat, facing up
+  portalDisc.castShadow = false;
+  portalDisc.receiveShadow = false;
+  portalDisc.userData.isPortalDisc = true;
+  portalRender.registerDisc(portalDisc);   // hidden during the virtual-camera RT pass
+  discGroup.add(portalDisc);
+  g.add(discGroup);
 
-  // rotating halo ring + a vertical holographic scan ring
+  // thin accent rim at the edge of the portal window (additive glow)
+  const rimMat = new THREE.MeshBasicMaterial({
+    color: ac, transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(4.05, 0.11, 6, 52), rimMat);
+  rim.rotation.x = -Math.PI / 2;
+  rim.position.y = 3.37;
+  g.add(rim);
+
+  // outer halo ring (accent colour, animated spin)
   const ringMat = new THREE.MeshStandardMaterial({ color: ac, emissive: ac, emissiveIntensity: 1.8 });
   const ring = new THREE.Mesh(new THREE.TorusGeometry(4.7, 0.07, 6, 44), ringMat);
   ring.rotation.x = -Math.PI / 2; ring.position.y = 3.55; g.add(ring);
 
-  // a small floating "return / map" glyph sprite above it
-  const glyph = makeGlyphSprite(accent);
-  glyph.position.set(0, 8.4, 0); g.add(glyph);
 
   g.traverse((o) => { if (o.isMesh || o.isSprite) o.userData.portal = true; });
   g.userData.portal = true;
+  // Face normal of the portal disc, in world space. Currently (0,1,0) — horizontal disc
+  // facing up. When portals gain tilt/orientation in the future, update this so that
+  // navigation always approaches perpendicularly to the actual portal face.
+  g.userData.portalNormal = new THREE.Vector3(0, 1, 0);
+  // World-space centre of the portal disc face (y = pedestal + disc height).
+  // Stored here so navigation can target it directly without raycasting twice.
+  // Recomputed after the group is positioned in world.js / city builders.
+  g.userData.portalCenter = new THREE.Vector3(0, 3.35, 0); // local, caller adds worldPos
 
   return {
     group: g,
     update(t) {
-      land.rotation.y = t * 0.25;
+      // Disc no longer spins: it's a true window (screen-space sampled), so rotating
+      // the mesh wouldn't rotate the content. Only the decorative halo ring spins.
       ring.rotation.z = t * 0.5;
-      glyph.position.y = 8.4 + Math.sin(t * 1.6) * 0.25;
     },
   };
+}
+
+// The portal disc as a genuine WINDOW: the fragment shader samples the shared render
+// target by SCREEN position (gl_FragCoord / resolution), not by the disc's own UVs.
+// That makes the disc show exactly the part of the virtual-camera frame it covers on
+// screen — the precondition for a seamless Portal-style cut. The RT is linear radiance,
+// so we apply the SAME ACES tone map + sRGB encode the main renderer uses (matched
+// exposure) so window pixels are indistinguishable from the surrounding world.
+function makePortalWindowMaterial() {
+  return new THREE.ShaderMaterial({
+    toneMapped: false,   // we tone-map inside the shader; don't let three double-apply
+    uniforms: {
+      uTex:      { value: portalRender.texture },
+      uRes:      { value: portalRender.resolution },   // live Vector2, updated each frame
+      uExposure: { value: ACTIVE.exposure },
+    },
+    vertexShader: /* glsl */`
+      void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform sampler2D uTex;
+      uniform vec2  uRes;
+      uniform float uExposure;
+
+      // three.js ACESFilmicToneMapping, replicated so the window matches the scene.
+      vec3 RRTAndODTFit(vec3 v) {
+        vec3 a = v * (v + 0.0245786) - 0.000090537;
+        vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+        return a / b;
+      }
+      vec3 ACESFilmic(vec3 color) {
+        color *= uExposure;
+        mat3 ACESInputMat = mat3(
+          0.59719, 0.07600, 0.02840,
+          0.35458, 0.90834, 0.13383,
+          0.04823, 0.01566, 0.83777);
+        mat3 ACESOutputMat = mat3(
+           1.60475, -0.10208, -0.00327,
+          -0.53108,  1.10813, -0.07276,
+          -0.07367, -0.00605,  1.07602);
+        color = ACESInputMat * color;
+        color = RRTAndODTFit(color);
+        return clamp(ACESOutputMat * color, 0.0, 1.0);
+      }
+      vec3 linearToSRGB(vec3 c) {
+        return mix(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055,
+                   c * 12.92, step(c, vec3(0.0031308)));
+      }
+      void main() {
+        vec2 uv = gl_FragCoord.xy / uRes;
+        vec3 col = texture2D(uTex, uv).rgb;   // linear scene radiance
+        gl_FragColor = vec4(linearToSRGB(ACESFilmic(col)), 1.0);
+      }
+    `,
+  });
 }
 
 // POI MARKER — a small floating "survey marker" that hovers over a landmark to

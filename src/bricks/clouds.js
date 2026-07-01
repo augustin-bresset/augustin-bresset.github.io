@@ -1,6 +1,8 @@
-// clouds.js (brick) — a few low-poly clouds drifting overhead casting soft moving
-// shadows (the quiet Ghibli touch), plus one soft, hazy band sitting far out at the
-// fog horizon so the sky has a gentle cloud line where the land fades away.
+// clouds.js (brick) — a soft, hazy horizon band sitting far out at the fog line so
+// the sky has a gentle cloud line where the land fades away. Overhead drifting clouds
+// were removed: at portal-transition altitudes (Y=230-320) they were traversed by the
+// camera, causing jarring pop-in. The horizon mist stays — it's always beyond the
+// camera's range and never intersects the camera path.
 import * as THREE from 'three';
 import { mulberry32 } from '../gen/noise.js';
 
@@ -8,35 +10,6 @@ export function buildClouds(seed, worldHalf) {
   const group = new THREE.Group();
   group.name = 'clouds';
   const rand = mulberry32((seed ^ 0xc10d5eed) >>> 0);
-
-  // ===== drifting overhead clouds (low-poly, cast shadows) =====
-  // Kept high in the sky so at the tilted horizon-vista framing they read as clouds
-  // overhead, never as floating rocks near the land.
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xf3eee4, flatShading: true, roughness: 1,
-    transparent: true, opacity: 0.96,
-  });
-  const blobGeo = new THREE.IcosahedronGeometry(1, 0);
-
-  const clouds = [];
-  const N = 9;
-  const range = 950;
-  for (let c = 0; c < N; c++) {
-    const cloud = new THREE.Group();
-    const puffs = 3 + ((rand() * 4) | 0);
-    for (let p = 0; p < puffs; p++) {
-      const m = new THREE.Mesh(blobGeo, mat);
-      m.position.set((rand() - 0.5) * 30, (rand() - 0.5) * 5, (rand() - 0.5) * 16);
-      const s = 7 + rand() * 10;
-      m.scale.set(s, s * 0.6, s);
-      m.castShadow = true;
-      cloud.add(m);
-    }
-    cloud.position.set((rand() - 0.5) * 2 * range, 230 + rand() * 90, (rand() - 0.5) * 2 * range);
-    const speed = 1.8 + rand() * 2.2;
-    group.add(cloud);
-    clouds.push({ cloud, speed });
-  }
 
   // ===== soft horizon band =====
   // A ring of big, soft sprite puffs far out where the land dissolves into the fog,
@@ -70,11 +43,7 @@ export function buildClouds(seed, worldHalf) {
 
   return {
     group,
-    update(t, dt) {
-      for (const c of clouds) {
-        c.cloud.position.x += c.speed * dt;
-        if (c.cloud.position.x > range) c.cloud.position.x = -range;
-      }
+    update(t) {
       // the haze breathes & drifts almost imperceptibly
       bank.rotation.y = t * 0.004;
       for (const b of banks) b.sp.position.y = b.baseY + Math.sin(t * 0.2 + b.a * 3) * 3;

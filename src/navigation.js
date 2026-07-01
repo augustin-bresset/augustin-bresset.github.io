@@ -3,6 +3,7 @@
 // building) to open that landmark's field note; click the orb to fly home. The note
 // is pinned in screen space beside the marker and re-projected each frame.
 import * as THREE from 'three';
+import { portalRender } from './portalRender.js';
 
 export class Navigation {
   constructor(stage, rig, world, ui) {
@@ -45,8 +46,10 @@ export class Navigation {
     });
   }
 
-  // raycast the city groups; returns {cityId, portal, poi} for the first hit by
-  // walking ancestors (a mesh inherits its landmark's poi tag / its portal flag).
+  // raycast the city groups; returns {cityId, portal, poi, portalPoint, portalNormal}.
+  // portalPoint  — world-space hit position on the portal disc surface.
+  // portalNormal — world-space face normal of the portal (from userData.portalNormal,
+  //                so future portals with custom tilt just set that field).
   _pick(e) {
     const r = this.stage.renderer.domElement.getBoundingClientRect();
     this.ndc.set(
@@ -56,16 +59,29 @@ export class Navigation {
     this.ray.setFromCamera(this.ndc, this.rig.camera);
     const hits = this.ray.intersectObjects(this.cityGroups, true);
     for (const h of hits) {
-      let o = h.object, cityId = null, portal = false, poi = null;
+      let o = h.object, cityId = null, portal = false, poi = null, portalNormal = null;
       while (o) {
         if (o.userData.portal) portal = true;
+        if (o.userData.portalNormal && !portalNormal) {
+          // Transform the stored local normal to world space via the group's rotation.
+          // For the current horizontal disc (Y-only rotation) this stays (0,1,0).
+          // Future tilted portals just update userData.portalNormal accordingly.
+          portalNormal = o.userData.portalNormal.clone()
+            .transformDirection(o.matrixWorld).normalize();
+        }
         if (o.userData.poi && !poi) poi = o.userData.poi;
         if (o.userData.cityId && !cityId) cityId = o.userData.cityId;
         o = o.parent;
       }
-      if (cityId || portal || poi) return { cityId, portal, poi };
+      if (cityId || portal || poi) {
+        return {
+          cityId, portal, poi,
+          portalPoint:  portal ? h.point.clone() : null,
+          portalNormal: portal ? (portalNormal ?? new THREE.Vector3(0, 1, 0)) : null,
+        };
+      }
     }
-    return { cityId: null, portal: false, poi: null };
+    return { cityId: null, portal: false, poi: null, portalPoint: null, portalNormal: null };
   }
 
   _onMove(e) {
@@ -92,12 +108,12 @@ export class Navigation {
       const { cityId } = this._pick(e);
       if (cityId) this.diveTo(cityId);
     } else if (this.state === 'city') {
-      const { poi, portal } = this._pick(e);
+      const { poi, portal, portalPoint, portalNormal } = this._pick(e);
       if (poi) {
         if (poi === this.openPoiId) this.closeNote();
         else this.openNote(this._poiById[poi]);
       } else if (portal) {
-        this.back();                             // the mini-map orb → fly home
+        this.portalBack(portalPoint, portalNormal); // Klein-bottle dive through portal
       } else if (this.openPoiId) {
         this.closeNote();                        // click empty space dismisses
       }
@@ -233,5 +249,114 @@ export class Navigation {
       this.ui.showHint('hint');
       this.ui.setLegend(true);
     }, 1250);
+  }
+
+  // Portal disc clicked: seamless "window" transition (Portal-style cut).
+  //
+  // The disc is a true window (portalRender): it shows the world as seen by a virtual
+  // camera = the player camera lifted ΔY into the sky. So:
+  //
+  // Phase 1 — Arc (1.0 s): swing to face the portal along its normal (near-overhead for
+  //   a horizontal disc), radius unchanged — a smooth elliptic sweep.
+  // Phase 2 — Dive (0.85 s): plunge straight down the normal until the disc FILLS the
+  //   whole screen. At that instant every pixel on screen is the window = the virtual
+  //   camera's frame.
+  // Phase 3 — Swap (1 frame): move the real camera to the virtual pose exactly (same
+  //   position + orientation). Nothing on screen changes → invisible cut. See _portalSwap.
+  // Phase 4 — Settle: a gentle, CONTINUOUS ease from that matched frame to the overview.
+  //
+  // portalPoint  — world-space hit on the disc surface (from raycast).
+  // portalNormal — world-space face normal of the portal (tagged in kit.js userData).
+  portalBack(portalPoint = null, portalNormal = null) {
+    if (this.state === 'overview') return;
+    this.closeNote();
+
+    let fallbackTarget = this.rig.target.clone();
+    if (this.activeCity) {
+      fallbackTarget = this.activeCity.worldPos.clone();
+      fallbackTarget.y += 3.35;
+    }
+
+    this.rig.orbitOnly = false;
+    this.ui.setBack(false);
+    this.activeCity = null;
+    this._poiById = {};
+    this._hoverPoi = null;
+    this.state = 'diving';
+
+    const discCenter = portalPoint ?? fallbackTarget;
+    const N = (portalNormal ?? new THREE.Vector3(0, 1, 0)).clone().normalize();
+
+    // Approach perpendicular to the portal face, from its normal:
+    //   polar   = acos(N.y) → ~0 (straight overhead) for a horizontal disc
+    //   azimuth = atan2(N.x, N.z) → from the direction the portal faces
+    const approachPolar = Math.max(0.04, Math.min(Math.PI - 0.04, Math.acos(N.y)));
+    const approachAzim = (Math.abs(N.x) + Math.abs(N.z) > 0.01)
+      ? Math.atan2(N.x, N.z)
+      : this.rig.azimuth;
+
+    // Phase 1 — Arc: swing to face the portal, radius held (great-circle sweep).
+    this.rig.focusOn({
+      target:  discCenter,
+      polar:   approachPolar,
+      azimuth: approachAzim,
+      radius:  this.rig.radius,
+      onDone:  () => {
+        // Phase 2 — Dive: close in until the 4-unit disc covers the whole frame.
+        // At radius 3.6 (fov 42°, 16:9) the disc rim projects past the screen corners.
+        this.rig.focusOn({
+          target:  discCenter,
+          polar:   approachPolar,
+          azimuth: approachAzim,
+          radius:  3.6,
+          onDone:  () => this._portalSwap(),
+        }, 0.85);
+      },
+    }, 1.0);
+  }
+
+  // Phase 3 — the seamless swap. Reproduce the virtual camera pose (player lifted ΔY)
+  // EXACTLY in rig parameters, so apply() places the real camera where the window was
+  // already showing. Then ease gently to the overview (continuous, no cut).
+  _portalSwap() {
+    const liftY = portalRender.liftY;
+
+    // Player's exact pose at the end of the dive.
+    const camPos = this.rig.camera.position.clone();
+    const dir = new THREE.Vector3();
+    this.rig.camera.getWorldDirection(dir);   // unit view direction (points into screen)
+
+    // Virtual camera = same orientation, position lifted ΔY.
+    const C = camPos.clone(); C.y += liftY;
+
+    // Solve rig params (target, azimuth, polar, radius) that reproduce (position C,
+    // view direction dir) exactly — see CameraRig.apply():
+    //   position = target − radius·dir ,  looking along dir.
+    // radius is chosen so the target lands on the ground plane (y = 0) ahead of us.
+    const pol = Math.acos(THREE.MathUtils.clamp(-dir.y, -1, 1));
+    const az  = Math.atan2(-dir.x, -dir.z);
+    const radius = (dir.y < -1e-3) ? (-C.y / dir.y) : 1200;   // ground hit, or far ahead
+    const target = C.clone().add(dir.clone().multiplyScalar(radius));
+
+    this.rig._tgt.copy(target);  this.rig.target.copy(target);
+    this.rig._azim = this.rig.azimuth = az;
+    this.rig._pol  = this.rig.polar   = pol;
+    this.rig._rad  = this.rig.radius  = radius;
+    this.rig.apply();   // camera now sits exactly where the window showed → invisible cut
+
+    // Phase 4 — settle to the overview. Continuous motion from the matched frame.
+    const h = this.rig.home;
+    this.rig.focusOn({
+      azimuth: h.azimuth, polar: h.polar,
+      radius:  h.radius,  target: h.target.clone(),
+      fov: 42,
+      onDone: () => {
+        this.rig.enabled   = true;
+        this.rig.idleDrift = true;
+        this.state = 'overview';
+        this.ui.showHint('hint');
+        this.ui.setLegend(true);
+      },
+    }, 1.8);
   }
 }
