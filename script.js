@@ -45,8 +45,9 @@ function boot() {
   const navLang = (navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
   LANG.current = qp.get('lang') === 'fr' ? 'fr' : qp.get('lang') === 'en' ? 'en' : navLang;
 
-  // island (default, light) or the heavier endless continent via ?mode=land
-  const mode = qp.get('mode') === 'land' ? 'land' : 'island';
+  // generation mode: island (default, light), the flying island (?mode=floating),
+  // or the heavier endless continent (?mode=land)
+  const mode = ['land', 'floating'].includes(qp.get('mode')) ? qp.get('mode') : 'island';
   const world = buildWorld(stage, seed, { mode });
   stage.scene.add(world.group);
 
@@ -92,7 +93,7 @@ function boot() {
   const outline = createOutline(stage.renderer, stage.scene, () => rig.camera, container);
   const syncOutline = () => {
     outline.setStrength(ACTIVE.outlineStrength); outline.setInk(ACTIVE.ink);
-    outline.setWash(ACTIVE.desat || 0, ACTIVE.wash || 0, ACTIVE.washTone);
+    outline.setWash(ACTIVE.desat || 0, ACTIVE.wash || 0, ACTIVE.washTone, ACTIVE.hatch || 0);
   };
   syncOutline();
   stage.setRenderHook(() => {

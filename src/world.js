@@ -15,19 +15,22 @@ import { buildRocks } from './bricks/rocks.js';
 import { buildVolcano } from './bricks/volcano.js';
 import { buildClouds } from './bricks/clouds.js';
 import { buildFlying } from './bricks/flying.js';
-import { ACTIVE } from './themes.js';
 import { smoothstep, mulberry32 } from './gen/noise.js';
 import { CITIES } from './cities/registry.js';
 import { placeCities } from './cities/placement.js';
 
 // WORLD is the PLAYABLE / camera reference scale (immersed view, city roam disc).
-// Two generation PRESETS share that camera scale:
+// Generation PRESETS (?mode=) share that camera scale:
 //   island (default) — a big island whose coast follows the Voronoi cells (sea is
 //     forced as you get far from centre); a modest grid, so it loads fast anywhere.
+//   floating (?mode=floating) — the same island generation, but adrift in a blue
+//     sky: a jagged rock underside hangs beneath it and a cloud sea replaces the
+//     ocean (the flying island is a way to GENERATE the world, not a theme).
 //   land  (?mode=land) — the much larger endless continent; heavier to load.
 export const WORLD = { size: 1000, half: 500 };
 const PRESETS = {
   island: { size: 1600, half: 800, N: 320 },
+  floating: { size: 1600, half: 800, N: 320, flying: true },
   land: { size: 2800, half: 1400, N: 512 },
 };
 
@@ -163,17 +166,22 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   group.add(sea.mesh);
   updaters.push((t) => sea.update(t));
 
-  // 13. FLYING-ISLAND rig (underside rock + cloud sea) — built hidden; the flying
-  // theme shows it and hides the ocean. See bricks/flying.js.
-  const flying = buildFlying(field, cfg.half, seed);
-  group.add(flying.group);
-  updaters.push((t) => flying.update(t));
+  // 13. FLYING-ISLAND rig (underside rock + cloud sea) — this is a GENERATION mode
+  // (?mode=floating), not a theme: when on, the rock underside hangs below the
+  // island, a cloud sea replaces the ocean, and the sea plane is hidden. Built only
+  // for floating worlds. See bricks/flying.js.
+  if (cfg.flying) {
+    const flying = buildFlying(field, cfg.half, seed);
+    group.add(flying.group);
+    flying.setVisible(true);
+    sea.mesh.visible = false;        // no ocean under a floating island
+    updaters.push((t) => flying.update(t));
+  }
 
-  // re-apply the active theme to this world's baked meshes (vertex colours, water)
-  // and toggle the flying rig / ocean — without rebuilding geometry.
-  const applyFlying = () => { flying.setVisible(ACTIVE.flying); sea.mesh.visible = !ACTIVE.flying; };
-  const restyle = () => { terrain.restyle(); sea.restyle(); applyFlying(); };
-  applyFlying();   // initial state (matches the theme set before build)
+  // re-apply the active AMBIANCE to this world's baked meshes (vertex colours,
+  // water) without rebuilding geometry. The flying rig is fixed by the mode, so a
+  // theme switch never touches it.
+  const restyle = () => { terrain.restyle(); sea.restyle(); };
 
   return { group, updaters, cities, field, graph, hydro, slope, scatter, scenicAzimuth, restyle };
 }

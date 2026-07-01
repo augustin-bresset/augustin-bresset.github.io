@@ -28,6 +28,8 @@ export function createOutline(renderer, scene, getCamera, container) {
       uDesat: { value: 0 },           // sketch: pull whole frame toward greyscale
       uWash: { value: 0 },            // sketch: tint whole frame toward paper
       uPaper: { value: new THREE.Color('#efe9db') },
+      uHatch: { value: 0 },           // sketch: pencil cross-hatching in the shadows
+      uResolution: { value: new THREE.Vector2(w(), h()) },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -38,10 +40,21 @@ export function createOutline(renderer, scene, getCamera, container) {
       uniform sampler2D tDiffuse; uniform sampler2D tDepth;
       uniform vec2 uTexel; uniform float uNear, uFar, uStrength, uThresh;
       uniform vec3 uInk;
-      uniform float uDesat, uWash; uniform vec3 uPaper;
+      uniform float uDesat, uWash, uHatch; uniform vec3 uPaper; uniform vec2 uResolution;
       float lin(float z){
         float ndc = z * 2.0 - 1.0;
         return (2.0 * uNear * uFar) / (uFar + uNear - ndc * (uFar - uNear));
+      }
+      // one layer of parallel pencil strokes at angle 'ang', spacing 'sp' (px), that
+      // only appears where luminance drops below 'thr' — and thickens as it darkens.
+      float hatchLayer(vec2 p, float ang, float sp, float lum, float thr){
+        if (lum > thr) return 1.0;
+        float c = cos(ang), s = sin(ang);
+        float coord = p.x * c + p.y * s;
+        float t = abs(fract(coord / sp) - 0.5) * 2.0;      // 0 at stroke centre
+        float depth = clamp((thr - lum) / max(thr, 0.001), 0.0, 1.0);
+        float wdt = 0.10 + 0.20 * depth;                    // darker → thicker stroke
+        return smoothstep(wdt, wdt + 0.30, t);              // 0 on stroke, 1 between
       }
       void main(){
         vec4 col = texture2D(tDiffuse, vUv);
@@ -58,6 +71,17 @@ export function createOutline(renderer, scene, getCamera, container) {
         float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
         vec3 base = mix(col.rgb, vec3(lum), uDesat);
         base = mix(base, uPaper, uWash);
+        // pencil cross-hatching: layered strokes bite into the mid-to-dark tones,
+        // building up to a cross-hatch in the darkest pockets. Bright paper (sky,
+        // highlights) stays clean. Screen-space, like strokes laid over the page.
+        if (uHatch > 0.0) {
+          vec2 sc = vUv * uResolution;
+          float hs = 1.0;
+          hs *= hatchLayer(sc,  0.60,  9.0, lum, 0.46);     // shade tone
+          hs *= hatchLayer(sc, -0.72, 10.0, lum, 0.26);     // cross-hatch in shadow
+          hs *= hatchLayer(sc,  1.45,  8.0, lum, 0.13);     // dense in the darkest
+          base = mix(base, uInk, (1.0 - hs) * uHatch);
+        }
         vec3 outc = mix(base, uInk, edge * uStrength);
         gl_FragColor = vec4(outc, 1.0);
       }
@@ -74,15 +98,17 @@ export function createOutline(renderer, scene, getCamera, container) {
     rt.depthTexture.image.width = w();
     rt.depthTexture.image.height = h();
     mat.uniforms.uTexel.value.set(1 / w(), 1 / h());
+    mat.uniforms.uResolution.value.set(w(), h());
   }
   window.addEventListener('resize', setSize);
 
   return {
     setStrength(s) { mat.uniforms.uStrength.value = s; },
     setInk(c) { mat.uniforms.uInk.value.set(c); },
-    setWash(desat, wash, paper) {
+    setWash(desat, wash, paper, hatch) {
       mat.uniforms.uDesat.value = desat;
       mat.uniforms.uWash.value = wash;
+      mat.uniforms.uHatch.value = hatch || 0;
       if (paper) mat.uniforms.uPaper.value.set(paper);
     },
     render() {

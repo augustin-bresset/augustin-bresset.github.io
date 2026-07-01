@@ -1,12 +1,16 @@
-// themes.js — the visual THEME layer the whole scene reads from. Pure data (no
+// themes.js — the visual AMBIANCE layer the whole scene reads from. Pure data (no
 // Three, so gen/ tests can import biomes.js which reads ACTIVE without pulling in a
 // renderer). `ACTIVE` is a single mutable object; `setTheme` copies a preset into it
 // in place, so modules that hold a reference to ACTIVE see the change. Geometry isn't
 // rebuilt on a theme switch — terrain re-colours its vertex buffer, materials/lights/
-// fog/exposure update in place, and the ink outline + paper overlay toggle.
+// fog/exposure update in place, and the ink outline + hatching + paper overlay toggle.
+//
+// NOTE: a theme is an AMBIANCE (how the world is drawn), NOT how the terrain is
+// generated. The flying island is a *generation mode* (?mode=floating, see world.js),
+// not a theme — so any ambiance can be applied to a flying-island world.
 
 export const THEMES = {
-  // the default painted low-poly diorama (the look built so far)
+  // the default painted low-poly diorama (the warm, sunlit look)
   diorama: {
     key: 'diorama', name: 'Diorama', label: '✎',
     sky: ['#d7cab2', '#e6dcc7', '#efe6d4'],
@@ -18,47 +22,32 @@ export const THEMES = {
     paperLerp: 0.17, paperTone: '#cabfa6',
     water: '#3f7e96', waterFloor: '#244e5e', waterOpacity: 0.9,
     outline: false, outlineStrength: 0.0, ink: '#2a1808',
-    desat: 0, wash: 0, washTone: '#efe9db',
-    flying: false,
+    desat: 0, wash: 0, washTone: '#efe9db', hatch: 0,
     bodyClass: '',
   },
-  // a pale pencil-and-wash CROQUIS: washed-out colours, soft flat light, ink edges,
-  // heavy paper grain — a page from a sketchbook.
+  // a full CROQUIS ambiance: the world redrawn as a graphite-and-wash sketchbook
+  // page — near-monochrome pencil tones on warm paper, ink silhouettes, and real
+  // pencil HATCHING that thickens in the shadows (the post pass does the hatch).
+  // Flat, bright paper light so form is carried by line + hatch, not smooth shading.
   sketch: {
-    key: 'sketch', name: 'Croquis', label: '❖',
-    sky: ['#e9ebe6', '#f1f0ea', '#f6f4ee'],   // pale paper
-    fog: '#eeece2', fogNear: 500, fogFar: 1180,
-    hemiSky: '#ffffff', hemiGround: '#d8cfbe', hemiInt: 1.12,  // flat & bright
-    sunColor: '#fff8ec', sunInt: 0.5, sunShadow: true,          // faint → soft shadows
-    ambient: '#cdc4b0', ambientInt: 0.72,
-    exposure: 1.22,                            // washed out, brighter paper
-    paperLerp: 0.57, paperTone: '#e4ddcd',     // strong pale wash
-    water: '#b4c6c9', waterFloor: '#9fb2b4', waterOpacity: 0.82,
-    outline: true, outlineStrength: 0.9, ink: '#4a4034',        // pencil, not harsh black
-    desat: 0.55, wash: 0.16, washTone: '#efe9db',              // whole-frame croquis wash
-    flying: false,
+    key: 'sketch', name: 'Croquis', label: '✎',
+    sky: ['#efece3', '#f4f1e9', '#f8f6f0'],   // flat pale paper
+    fog: '#f1eee4', fogNear: 470, fogFar: 1150,
+    hemiSky: '#ffffff', hemiGround: '#e2dac9', hemiInt: 1.2,   // flat & bright
+    sunColor: '#fffaf0', sunInt: 0.4, sunShadow: true,          // faint → soft shadows
+    ambient: '#d3cab6', ambientInt: 0.84,
+    exposure: 1.3,                             // washed out, bright paper
+    paperLerp: 0.6, paperTone: '#e9e2d3',      // strong pale wash on the terrain
+    water: '#c4ccc8', waterFloor: '#adb4b0', waterOpacity: 0.68,
+    outline: true, outlineStrength: 1.0, ink: '#372f26',        // graphite, not black
+    desat: 0.82, wash: 0.28, washTone: '#efe7d6',             // pale near-monochrome
+    hatch: 0.7,                                // pencil cross-hatching in the shadows
     bodyClass: 'theme-sketch',
-  },
-  // a FLYING ISLAND adrift in a blue sky: the ocean is hidden, the island floats
-  // above a cloud sea on a jagged rock underside (see bricks/flying.js).
-  floating: {
-    key: 'floating', name: 'Île volante', label: '☁',
-    sky: ['#5c93bf', '#8fbcd8', '#c6dcea'],   // blue sky → pale at the horizon
-    fog: '#c3dae7', fogNear: 520, fogFar: 1350,
-    hemiSky: '#eaf3fb', hemiGround: '#9caf9e', hemiInt: 0.95,
-    sunColor: '#fff6e2', sunInt: 1.05, sunShadow: true,
-    ambient: '#6c7d88', ambientInt: 0.5,
-    exposure: 1.03,
-    paperLerp: 0.14, paperTone: '#c9c2ad',    // keep the land fairly natural
-    water: '#7fb3cf', waterFloor: '#4d7f93', waterOpacity: 0.9,
-    outline: false, outlineStrength: 0.0, ink: '#2a1808',
-    desat: 0, wash: 0, washTone: '#efe9db',
-    flying: true,
-    bodyClass: '',
   },
 };
 
-export const THEME_ORDER = ['diorama', 'sketch', 'floating'];
+// the live ambiance cycle (the flying island is a generation mode, not here)
+export const THEME_ORDER = ['diorama', 'sketch'];
 
 // the live active theme — mutated in place by setTheme so holders stay in sync
 export const ACTIVE = { ...THEMES.diorama };
