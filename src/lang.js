@@ -9,13 +9,13 @@ export const LANG = {
   strings: {
     en: {
       hint: 'Click a settlement to explore  ·  drag to look around',
-      cityHint: 'Click the glowing markers to read each story  ·  the orb returns to the map',
+      cityHint: 'Drag to orbit  ·  click the glowing markers to read each story  ·  the orb returns to the map',
       back: 'Back to the island',
       legendTitle: 'Settlements',
     },
     fr: {
       hint: 'Cliquez un lieu pour explorer  ·  glissez pour regarder',
-      cityHint: 'Cliquez les marqueurs lumineux pour lire chaque histoire  ·  l’orbe ramène à la carte',
+      cityHint: 'Glissez pour tourner autour  ·  cliquez les marqueurs lumineux pour lire chaque histoire  ·  l’orbe ramène à la carte',
       back: "Retour à l'île",
       legendTitle: 'Les lieux',
     },

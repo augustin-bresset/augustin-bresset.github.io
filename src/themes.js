@@ -41,7 +41,7 @@ export const THEMES = {
     water: '#c4ccc8', waterFloor: '#adb4b0', waterOpacity: 0.68,
     outline: true, outlineStrength: 1.0, ink: '#372f26',        // graphite, not black
     desat: 0.82, wash: 0.28, washTone: '#efe7d6',             // pale near-monochrome
-    hatch: 0.7,                                // pencil cross-hatching in the shadows
+    hatch: 0,                                  // (no screen-space hatching — Augustin)
     bodyClass: 'theme-sketch',
   },
 };

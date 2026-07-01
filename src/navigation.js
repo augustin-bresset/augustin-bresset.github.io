@@ -180,6 +180,7 @@ export class Navigation {
     this._poiById = Object.fromEntries((city.pois || []).map((p) => [p.id, p]));
     this._hoverPoi = null;
     this.openPoiId = null;
+    this.rig.orbitOnly = true;        // drag = orbit the settlement (see every façade)
     this._applyPoiStates();
     this.ui.setBack(true);
     this.ui.setLegend(false);
@@ -219,6 +220,7 @@ export class Navigation {
   back() {
     if (this.state === 'overview') return;
     this.closeNote();
+    this.rig.orbitOnly = false;       // back to map-panning
     this.ui.setBack(false);
     this.activeCity = null;
     this._poiById = {};
