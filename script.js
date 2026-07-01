@@ -70,7 +70,10 @@ function boot() {
   // Ink outline pass (pencil edges) — active only in themes that ask for it (sketch).
   // The render hook always runs; it inks when the theme wants it, else renders plainly.
   const outline = createOutline(stage.renderer, stage.scene, () => rig.camera, container);
-  const syncOutline = () => { outline.setStrength(ACTIVE.outlineStrength); outline.setInk(ACTIVE.ink); };
+  const syncOutline = () => {
+    outline.setStrength(ACTIVE.outlineStrength); outline.setInk(ACTIVE.ink);
+    outline.setWash(ACTIVE.desat || 0, ACTIVE.wash || 0, ACTIVE.washTone);
+  };
   syncOutline();
   stage.setRenderHook(() => {
     if (ACTIVE.outline) outline.render();

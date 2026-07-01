@@ -18,6 +18,7 @@ export const THEMES = {
     paperLerp: 0.17, paperTone: '#cabfa6',
     water: '#3f7e96', waterFloor: '#244e5e', waterOpacity: 0.9,
     outline: false, outlineStrength: 0.0, ink: '#2a1808',
+    desat: 0, wash: 0, washTone: '#efe9db',
     bodyClass: '',
   },
   // a pale pencil-and-wash CROQUIS: washed-out colours, soft flat light, ink edges,
@@ -33,6 +34,7 @@ export const THEMES = {
     paperLerp: 0.57, paperTone: '#e4ddcd',     // strong pale wash
     water: '#b4c6c9', waterFloor: '#9fb2b4', waterOpacity: 0.82,
     outline: true, outlineStrength: 0.9, ink: '#4a4034',        // pencil, not harsh black
+    desat: 0.55, wash: 0.16, washTone: '#efe9db',              // whole-frame croquis wash
     bodyClass: 'theme-sketch',
   },
 };
