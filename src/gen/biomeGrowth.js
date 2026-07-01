@@ -10,9 +10,37 @@
 import { mulberry32, Simplex } from './noise.js';
 import { BIOME, BIOMES, adjWeight } from './biomes.js';
 
+// ---- MACRO TRENDS ----------------------------------------------------------
+// Each world rolls ONE trend that tilts the whole generation toward a character:
+// an alpine world grows more (and taller) mountains, a prairie world spreads
+// open grassland, a highlands world rolls Scottish moor and grass plateaus, etc.
+// `w` multiplies a biome's seeding/growth weight; `h` multiplies its terrain
+// amplitude (picked up by heightmap.js via graph.trendHeight). Biomes not listed
+// keep their defaults, and the region-size saturation damping still applies, so
+// a trend flavours the map without letting one biome devour it.
+const TRENDS = [
+  { key: 'balanced',  pick: 2, w: {} },
+  { key: 'alpine',    pick: 1, w: { mountain: 2.4, snow: 2.2, hills: 1.6, taiga: 1.7, plains: 0.55, desert: 0.5, savanna: 0.6, marsh: 0.5 },
+    h: { mountain: 1.16, snow: 1.12 } },
+  { key: 'prairie',   pick: 1, w: { plains: 2.6, savanna: 1.7, beach: 1.2, moor: 1.2, mountain: 0.4, snow: 0.3, hills: 0.6, mesa: 0.5 },
+    h: { mountain: 0.88 } },
+  { key: 'verdant',   pick: 1, w: { forest: 2.3, taiga: 1.6, marsh: 1.7, plains: 1.3, desert: 0.3, savanna: 0.5, mesa: 0.4 } },
+  { key: 'arid',      pick: 1, w: { desert: 2.4, savanna: 2.0, mesa: 2.2, plains: 0.7, forest: 0.4, marsh: 0.3, taiga: 0.5, snow: 0.5 } },
+  { key: 'highlands', pick: 1, w: { moor: 2.8, plateau: 2.2, hills: 1.9, taiga: 1.3, forest: 0.7, desert: 0.3, savanna: 0.4, mesa: 0.4 },
+    h: { moor: 1.08, plateau: 1.05 } },
+];
+
 export function growBiomes(graph, seed, { mode = 'island' } = {}) {
   const { sites, neighbors, cols, rows } = graph;
   const rand = mulberry32((seed ^ 0xb107e9a1) >>> 0);
+
+  // roll this world's macro trend (seeded — same seed, same world character)
+  let tTot = 0; for (const t of TRENDS) tTot += t.pick;
+  let tr = rand() * tTot, trend = TRENDS[0];
+  for (const t of TRENDS) { tr -= t.pick; if (tr <= 0) { trend = t; break; } }
+  graph.trend = trend.key;
+  graph.trendHeight = trend.h || {};
+  const trendW = (id) => trend.w[BIOMES[id].key] ?? 1;
 
   const LAND = BIOMES.filter((b) => b.id !== BIOME.OCEAN && b.id !== BIOME.VOLCANIC);
 
@@ -53,11 +81,11 @@ export function growBiomes(graph, seed, { mode = 'island' } = {}) {
   // soft saturation target (in site-cells): around this size a biome's odds halve
   const TARGET = Math.max(10, sites.length * 0.05);
 
-  // weighted pick of a land biome by base weight
+  // weighted pick of a land biome by base weight × the world's trend multiplier
   function randomLand() {
-    let tot = 0; for (const b of LAND) tot += b.weight;
+    let tot = 0; for (const b of LAND) tot += b.weight * trendW(b.id);
     let r = rand() * tot;
-    for (const b of LAND) { r -= b.weight; if (r <= 0) return b.id; }
+    for (const b of LAND) { r -= b.weight * trendW(b.id); if (r <= 0) return b.id; }
     return BIOME.PLAINS;
   }
 
@@ -158,8 +186,8 @@ export function growBiomes(graph, seed, { mode = 'island' } = {}) {
       for (const cid of CANDIDATES) {
         let w = 1;
         for (const n of nb) w *= (adjWeight(n.biome, cid) + 0.04);
-        // light bias toward the biome's base frequency
-        w *= 0.5 + BIOMES[cid].weight;
+        // light bias toward the biome's base frequency, tilted by the world trend
+        w *= (0.5 + BIOMES[cid].weight) * trendW(cid);
         // soft saturation: damp a biome whose adjacent region is already large so
         // no single biome can run away and swallow the map (see union-find above)
         w *= 1 / (1 + adjRegionSize(nb, cid) / TARGET);

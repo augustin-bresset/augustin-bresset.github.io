@@ -5,10 +5,26 @@ import { mulberry32 } from '../gen/noise.js';
 import { BIOME, BY_KEY } from '../gen/biomes.js';
 import { PLACE_ORDER, desiredDist } from './registry.js';
 
-export function placeCities(field, graph, seed, cities) {
+export function placeCities(field, graph, seed, cities, hydro = null) {
   const rand = mulberry32((seed ^ 0xc17ee5) >>> 0);
   const byId = Object.fromEntries(cities.map((c) => [c.id, c]));
   const half = field.half;
+
+  // distance to the nearest river centre-line (subsampled) so cities can AVOID
+  // settling astride a river — a channel slicing through the flattened city pad
+  // reads wrong. Infinity when there's no hydrology (or no rivers survived).
+  const riverPts = [];
+  if (hydro) for (const poly of hydro.rivers) {
+    for (let i = 0; i < poly.length; i += 3) riverPts.push(poly[i]);
+  }
+  const distToRiver = (x, z) => {
+    let m = Infinity;
+    for (const p of riverPts) {
+      const d = Math.hypot(x - p.x, z - p.z);
+      if (d < m) m = d;
+    }
+    return m;
+  };
 
   // candidate sites: on land, NOT on the volcano cone, and inside the central
   // REACHABLE disc (radius 260) so every city can be reached by panning — the
@@ -63,6 +79,12 @@ export function placeCities(field, graph, seed, cities) {
       if (tooClose) continue;
 
       let score = affinityScore(city, s) * 2.4;
+      // stay clear of rivers: a channel through the city pad looks wrong. Soft
+      // penalty (not a veto) so placement still succeeds on river-dense worlds;
+      // any residual crossing is clipped around the pad in world.js.
+      const dRiver = distToRiver(s.x, s.z);
+      const clear = city.radius + 16;
+      if (dRiver < clear) score -= 2.0 * (1 - dRiver / clear);
       // Toaster's forge gravitates to the lone volcano (heat/fire kinship): reward a
       // band ~80u from the cone so it settles beside it, never on it.
       if (id === 'toaster' && volcPos) {

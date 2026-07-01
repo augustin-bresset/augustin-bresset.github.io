@@ -8,9 +8,6 @@ import { BIOME, BIOMES } from './biomes.js';
 
 export const WATER_Y = 0;
 
-// per-biome moisture target (drives scatter + river-bank life)
-const MOIST = [0.9, 0.5, 0.45, 0.75, 0.4, 0.3, 0.25, 0.08, 0.2, 0.85, 0.1, 0.05];
-
 export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, graph) {
   const half = size / 2;
   const simElev = new Simplex(seed);
@@ -23,6 +20,10 @@ export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, 
   const heights = new Float32Array(verts * verts);
   const biome = new Uint8Array(verts * verts);
   const moisture = new Float32Array(verts * verts);
+
+  // per-biome amplitude multipliers from the world's macro TREND (see biomeGrowth):
+  // e.g. an 'alpine' world doesn't just have MORE mountain area, its peaks run taller.
+  const ampMul = BIOMES.map((b) => (graph.trendHeight && graph.trendHeight[b.key]) || 1);
 
   const idx = (i, j) => j * verts + i;
   const gx = (i) => -half + (i / N) * size;
@@ -45,8 +46,9 @@ export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, 
       let base = 0, amp = 0, ridged = 0, freq = 0, gain = 0;
       for (let k = 0; k < near.length; k++) {
         const wk = w[k] / wsum;
-        const hp = BIOMES[near[k].s.biome].height;
-        base   += wk * hp.base;   amp    += wk * hp.amp;
+        const nb = near[k].s.biome;
+        const hp = BIOMES[nb].height;
+        base   += wk * hp.base;   amp    += wk * hp.amp * ampMul[nb];
         ridged += wk * hp.ridged; freq   += wk * hp.freq;
         gain   += wk * (hp.gain ?? 0.5);
       }
@@ -100,7 +102,7 @@ export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, 
       heights[idx(i, j)] = y;
 
       // moisture from biome target + a little noise
-      let m = MOIST[bId] * 0.8 +
+      let m = (BIOMES[bId].moist ?? 0.4) * 0.8 +
         (0.5 + 0.5 * simMoist.fbm(wx * 0.012 + 30, wz * 0.012 - 17, { octaves: 3 })) * 0.2;
       moisture[idx(i, j)] = clamp(m, 0, 1);
 

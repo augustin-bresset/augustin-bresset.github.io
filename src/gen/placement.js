@@ -1,7 +1,7 @@
 // placement.js — scatter object positions from the biome grid.
 // Density per biome comes from biomes.scatterProfile so it's easy to tune.
 import { mulberry32 } from './noise.js';
-import { BIOME, scatterProfile } from './biomes.js';
+import { BIOME, BIOMES, scatterProfile } from './biomes.js';
 
 export function planScatter(field, slope, hydro, seed, exclusions = []) {
   const { N, idx, gx, gz, heights, moisture, biome } = field;
@@ -50,7 +50,9 @@ export function planScatter(field, slope, hydro, seed, exclusions = []) {
 
       if (prof.tree > 0 && rand() < prof.tree && !riverNear(i, j)) {
         const yy = field.heightAt(wx, wz);
-        const broad = b === BIOME.SAVANNA || b === BIOME.PLAINS || rand() < 0.3;
+        // tree species from the biome definition: broad, conifer, or a mixed stand
+        const kind = BIOMES[b].treeKind || 'mixed';
+        const broad = kind === 'broad' || (kind === 'mixed' && rand() < 0.3);
         trees.push({
           x: wx, y: yy, z: wz, scale: 0.85 + rand() * 0.8,
           rot: rand() * Math.PI * 2, kind: broad ? 'broad' : 'conifer', tint: rand(),
