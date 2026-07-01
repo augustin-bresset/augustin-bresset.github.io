@@ -1,6 +1,7 @@
 // kit.js — shared building blocks for the project "cities".
 // Small helpers so each city module stays focused on its own identity.
 import * as THREE from 'three';
+import { ACTIVE } from '../themes.js';
 
 export function box(w, h, d, color, opts = {}) {
   const geo = new THREE.BoxGeometry(w, h, d);
@@ -234,10 +235,18 @@ function makeGlyphSprite(accent) {
   const cv = document.createElement('canvas'); cv.width = s; cv.height = s;
   const ctx = cv.getContext('2d');
   ctx.clearRect(0, 0, s, s);
-  // soft disc backing
-  ctx.fillStyle = 'rgba(20,24,30,0.78)';
+  // soft disc backing — dark in the diorama so the neon accent pops; in the croquis
+  // a pale parchment disc with an ink arrow, so the return glyph stays a pencil mark
+  // instead of a dark ink blot on the pale drawing.
+  const pastel = ACTIVE.pastel > 0;
+  ctx.fillStyle = pastel ? 'rgba(240,231,213,0.92)' : 'rgba(20,24,30,0.78)';
   ctx.beginPath(); ctx.arc(s / 2, s / 2, 56, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = accent; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  if (pastel) {
+    ctx.strokeStyle = 'rgba(107,90,69,0.5)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(s / 2, s / 2, 55, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = pastel ? (ACTIVE.ink || '#6b5a45') : accent;
+  ctx.lineWidth = 6; ctx.lineCap = 'round';
   // circular return arrow
   ctx.beginPath(); ctx.arc(s / 2, s / 2, 30, Math.PI * 0.35, Math.PI * 1.9); ctx.stroke();
   const ex = s / 2 + 30 * Math.cos(Math.PI * 0.35), ey = s / 2 + 30 * Math.sin(Math.PI * 0.35);

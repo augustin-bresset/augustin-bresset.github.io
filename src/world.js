@@ -16,6 +16,7 @@ import { buildVolcano } from './bricks/volcano.js';
 import { buildClouds } from './bricks/clouds.js';
 import { buildFlying } from './bricks/flying.js';
 import { smoothstep, mulberry32 } from './gen/noise.js';
+import { ACTIVE } from './themes.js';
 import { CITIES } from './cities/registry.js';
 import { placeCities } from './cities/placement.js';
 
@@ -179,11 +180,52 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   }
 
   // re-apply the active AMBIANCE to this world's baked meshes (vertex colours,
-  // water) without rebuilding geometry. The flying rig is fixed by the mode, so a
-  // theme switch never touches it.
-  const restyle = () => { terrain.restyle(); sea.restyle(); };
+  // water, city materials) without rebuilding geometry. The flying rig is fixed by
+  // the mode, so a theme switch never touches it.
+  const restyle = () => {
+    terrain.restyle(); sea.restyle(); trees.restyle(); pastelizeCities(cities);
+  };
+  pastelizeCities(cities);            // bake the active ambiance into the cities now
 
   return { group, updaters, cities, field, graph, hydro, slope, scatter, scenicAzimuth, restyle };
+}
+
+// ---- CROQUIS city pastel ---------------------------------------------------
+// The project cities are built as neon cyberpunk districts (dark charcoals +
+// blazing emissive). On the pale pastel world that reads as heavy ink blots, so
+// in the croquis we redraw them as a soft coloured-pencil sketch: every material's
+// base colour is lifted toward white and the neon is dimmed to a gentle accent
+// (hue kept, blaze gone) — "beaucoup de couleur mais pâle". Originals are
+// snapshotted (userData.__croq) so a switch back to the diorama restores the neon.
+// The cities' update() loops only touch emissiveIntensity/opacity — never .color or
+// .emissive colour — so this one-shot restyle survives the animation loop.
+const _croqWhite = new THREE.Color(0xffffff);
+function pastelizeCities(cityList) {
+  const p = ACTIVE.pastel || 0;
+  const lift = Math.min(0.72, p + 0.26);   // building bodies → pale pencil
+  const emis = Math.max(0, 1 - p * 1.05);  // neon → soft coloured-pencil accent
+  for (const c of cityList) {
+    c.group.traverse((o) => {
+      const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+      for (const m of mats) {
+        if (!m.userData.__croq) {
+          m.userData.__croq = {
+            color: m.color ? m.color.clone() : null,
+            emissive: m.emissive ? m.emissive.clone() : null,
+          };
+        }
+        const o0 = m.userData.__croq;
+        if (m.color && o0.color) {
+          m.color.copy(o0.color);
+          if (p) m.color.lerp(_croqWhite, lift);
+        }
+        if (m.emissive && o0.emissive) {
+          m.emissive.copy(o0.emissive);
+          if (p) m.emissive.multiplyScalar(emis);
+        }
+      }
+    });
+  }
 }
 
 // Angle (world XZ) of the tallest distant terrain — sampled on a mid-far ring that
