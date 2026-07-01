@@ -43,6 +43,9 @@ export class CameraRig {
     this._tgt = this.target.clone();
 
     this.enabled = true;
+    // in a settlement we orbit AROUND the buildings: a plain drag rotates (instead of
+    // panning the map away), so you can walk the camera around and see every façade.
+    this.orbitOnly = false;
     this.tween = null;
     this.home = {
       azimuth: this.azimuth, polar: this.polar, radius: this.radius,
@@ -92,8 +95,8 @@ export class CameraRig {
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
       lastX = e.clientX; lastY = e.clientY;
       this._lastInteract = performance.now() / 1000;
-      if (e.shiftKey || button === 2) {
-        // rotate/orbit
+      if (this.orbitOnly || e.shiftKey || button === 2) {
+        // rotate/orbit (the default drag inside a settlement — see orbitOnly)
         this.azimuth -= dx * 0.005;
         this.polar = THREE.MathUtils.clamp(this.polar - dy * 0.004, this.minPolar, this.maxPolar);
       } else {
