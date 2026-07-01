@@ -1,13 +1,16 @@
-// script.js — entry point. Boots the stage, builds the procedural world,
-// wires the camera rig, UI and navigation, then runs the render loop.
+// script.js — entry point. Boots the stage, resolves the active WORLD from the URL,
+// builds it (a grounded terrain world, or the croquis fly-through), wires the camera,
+// UI and navigation, then runs the render loop. The top-right button cycles worlds.
 import { createStage } from './src/stage.js';
 import { CameraRig } from './src/camera.js';
 import { buildWorld, WORLD } from './src/world.js';
+import { buildCroquis } from './src/croquis.js';
 import { UI } from './src/ui.js';
 import { Navigation } from './src/navigation.js';
 import { LANG, cityLabel } from './src/lang.js';
 import { createOutline } from './src/postfx.js';
-import { ACTIVE, setTheme, nextThemeKey } from './src/themes.js';
+import { ACTIVE, setTheme } from './src/themes.js';
+import { resolveWorld, nextWorld, worldName } from './src/worlds.js';
 
 const container = document.getElementById('viewport');
 
@@ -29,10 +32,10 @@ if (!webglOK()) {
 function boot() {
   const qp = new URLSearchParams(location.search);
 
-  // initial visual THEME (?theme=sketch|floating) — set BEFORE the stage/world are
-  // built so their materials, lights and baked colours pick it up. setTheme falls back
-  // to diorama for a missing/unknown key. Live-switchable below.
-  setTheme(qp.get('theme'));
+  // which WORLD (island / floating / croquis / land) — resolved BEFORE the stage is
+  // built so the ambiance (lights/fog/sky/exposure) is right from the first frame.
+  const world = resolveWorld(qp);
+  setTheme(world.ambiance);
 
   const stage = createStage(container);
 
@@ -45,11 +48,52 @@ function boot() {
   const navLang = (navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
   LANG.current = qp.get('lang') === 'fr' ? 'fr' : qp.get('lang') === 'en' ? 'en' : navLang;
 
-  // generation mode: island (default, light), the flying island (?mode=floating),
-  // or the heavier endless continent (?mode=land)
-  const mode = ['land', 'floating'].includes(qp.get('mode')) ? qp.get('mode') : 'island';
-  const world = buildWorld(stage, seed, { mode });
-  stage.scene.add(world.group);
+  const ui = new UI();
+  // paper-grain boost lives on <body> in the sketch/croquis ambiance
+  document.body.classList.toggle('theme-sketch', world.ambiance === 'sketch');
+
+  // --- WORLD selector button (top-right): cycle to the next world and reload, keeping
+  // the same seed + language so it feels like stepping into another version of the
+  // same place. This replaces the old theme toggle. ---
+  const goToWorld = (key) => {
+    const p = new URLSearchParams(location.search);
+    p.set('world', key); p.set('seed', String(seed)); p.set('lang', LANG.current);
+    p.delete('mode'); p.delete('theme');
+    location.search = p.toString();
+  };
+  if (ui.themeBtn) {
+    ui.themeBtn.textContent = worldName(world, LANG.current);
+    ui.themeBtn.title = 'Change world';
+    ui.themeBtn.addEventListener('click', () => goToWorld(nextWorld(world.key).key));
+  }
+
+  // language toggle (common): relabel the buttons + hint; terrain worlds also relabel
+  // their city plaques (hooked in below).
+  const onLang = [];
+  ui.langBtn.addEventListener('click', () => {
+    LANG.current = LANG.current === 'en' ? 'fr' : 'en';
+    ui.refreshLang();
+    if (ui.themeBtn) ui.themeBtn.textContent = worldName(world, LANG.current);
+    onLang.forEach((f) => f());
+  });
+
+  // ===================== CROQUIS: the endless fly-through drawing =====================
+  if (world.croquis) {
+    const croquis = buildCroquis(stage, container, seed);
+    stage.scene.add(croquis.group);
+    stage.setCamera(croquis.camera);
+    if (croquis.resize) window.addEventListener('resize', croquis.resize);
+    ui.setLegend(false);
+    ui.setBack(false);
+    ui.showHint('croquisHint');
+    stage.onFrame((t, dt) => croquis.update(t, dt));
+    stage.start();
+    return;
+  }
+
+  // ===================== grounded worlds: island / floating / land =====================
+  const worldObj = buildWorld(stage, seed, { mode: world.mode });
+  stage.scene.add(worldObj.group);
 
   const reduceMotion = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -58,15 +102,13 @@ function boot() {
   if (reduceMotion) rig.idleDrift = false;
   // open the home view toward the generated mountain mass (computed in world.js) so
   // there are always real mountains on the horizon ahead.
-  if (world.scenicAzimuth != null) {
-    rig.azimuth = rig._azim = rig.home.azimuth = world.scenicAzimuth;
+  if (worldObj.scenicAzimuth != null) {
+    rig.azimuth = rig._azim = rig.home.azimuth = worldObj.scenicAzimuth;
     rig.apply();
   }
   stage.setCamera(rig.camera);
 
   // dev camera override (only fires when a param is present): ?pol=&rad=&az=&tx=&tz=&ty=
-  // lets a headless shot frame any angle past the runtime clamp (e.g. up at the
-  // flying underside). Inert in normal use — no param, no effect.
   {
     const num = (k) => (qp.has(k) ? parseFloat(qp.get(k)) : null);
     const D2R = Math.PI / 180;
@@ -83,13 +125,12 @@ function boot() {
     }
   }
 
-  const ui = new UI();
-  const nav = new Navigation(stage, rig, world, ui);
+  const nav = new Navigation(stage, rig, worldObj, ui);
   document.getElementById('note-close').addEventListener('click', () => nav.closeNote());
-  ui.buildLegend(world.cities, (id) => nav.diveTo(id));
+  ui.buildLegend(worldObj.cities, (id) => nav.diveTo(id));
 
-  // Ink outline pass (pencil edges) — active only in themes that ask for it (sketch).
-  // The render hook always runs; it inks when the theme wants it, else renders plainly.
+  // Ink outline pass — inert unless a world's ambiance asks for it (all four use plain
+  // rendering today, but the hook stays so an ambiance can opt in later).
   const outline = createOutline(stage.renderer, stage.scene, () => rig.camera, container);
   const syncOutline = () => {
     outline.setStrength(ACTIVE.outlineStrength); outline.setInk(ACTIVE.ink);
@@ -101,31 +142,13 @@ function boot() {
     else stage.renderer.render(stage.scene, rig.camera);
   });
 
-  // live THEME switcher: restyle the atmosphere + baked meshes in place (no rebuild)
-  const applyThemeUI = () => {
-    document.body.classList.toggle('theme-sketch', ACTIVE.key === 'sketch');
-    if (ui.themeBtn) ui.themeBtn.textContent = ACTIVE.name;
-    syncOutline();
-  };
-  applyThemeUI();
-  if (ui.themeBtn) ui.themeBtn.addEventListener('click', () => {
-    setTheme(nextThemeKey(ACTIVE.key));
-    stage.applyTheme();
-    world.restyle();
-    applyThemeUI();
-  });
-
-  // language toggle: button + city labels + panel + hint
-  applyCityLabels(world);
-  ui.langBtn.addEventListener('click', () => {
-    LANG.current = LANG.current === 'en' ? 'fr' : 'en';
-    ui.refreshLang();
-    applyCityLabels(world);
-  });
+  // city labels + language relabel hook
+  applyCityLabels(worldObj);
+  onLang.push(() => applyCityLabels(worldObj));
 
   stage.onFrame((t, dt) => {
     rig.update(t, dt);
-    for (const u of world.updaters) u(t, dt);
+    for (const u of worldObj.updaters) u(t, dt);
     nav.tick();                       // keep an open field-note pinned to its marker
   });
 
