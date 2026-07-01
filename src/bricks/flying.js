@@ -1,7 +1,12 @@
-// flying.js (brick) — the FLYING-ISLAND theme's extra geometry: a jagged rocky
-// UNDERSIDE hanging beneath the island (its top rim follows the real, organic
-// coastline) and a soft CLOUD SEA the island floats above. Built once and simply
-// shown/hidden on a theme switch (the ocean plane is hidden while it's visible).
+// flying.js (brick) — the FLYING-ISLAND / ARCHIPELAGO geometry: a jagged rocky
+// UNDERSIDE hanging beneath each landmass (its top rim follows the real island edge)
+// and a soft CLOUD SEA the islands float above. Built once and shown/hidden with the
+// mode (the ocean plane is hidden while it's visible).
+//
+// ?mode=floating carves the continent into separate islands (see gen/islands.js) and
+// passes their coastline rims here as opts.islands.rims — one skirt is hung per
+// island. Without that (legacy single flying island) one skirt is sampled around the
+// whole coastline.
 import * as THREE from 'three';
 import { mulberry32 } from '../gen/noise.js';
 
@@ -17,30 +22,23 @@ const DEEP = new THREE.Color('#2c261f');
 const DIRT = new THREE.Color('#5c4a32');
 const MOSS = new THREE.Color('#65763f');
 
-export function buildFlying(field, half, seed) {
-  const group = new THREE.Group();
-  group.name = 'flying';
-  const rand = mulberry32((seed ^ 0xf1a1) >>> 0);
+// Build one island's rocky underside: rings from the coast rim (following the real
+// terrain-edge height) tapering down to a keel, jagged with cheap hashed noise.
+function makeSkirt(field, cx, cz, rim, depth, seed) {
+  const SEG = rim.length;
+  const RINGS = 15;
+  const rand = seed;
+  const profileR = (u) => Math.max(0.05, (1 - u) * (1 + 0.28 * Math.sin(u * Math.PI)));
+  const easeU = (u) => Math.pow(u, 1.3);
 
-  // --- 1. sample the outer coastline radius per angle (organic silhouette) ---
-  const SEG = 84;
-  const maxR = half * 0.95;
-  const rim = [];
+  // top ring follows the real terrain height at the island edge, so the skirt meets
+  // cut cliffs (blob boundary through land) as well as the coast with no gap.
+  const topY = [];
   for (let a = 0; a < SEG; a++) {
     const th = (a / SEG) * Math.PI * 2;
-    const cx = Math.cos(th), cz = Math.sin(th);
-    let r = 60;                       // fallback (tiny island / all sea at this angle)
-    for (let rr = maxR; rr > 40; rr -= 10) {
-      if (field.heightAt(cx * rr, cz * rr) > 1.5) { r = rr + 8; break; }
-    }
-    rim.push(r);
+    const ex = cx + Math.cos(th) * rim[a], ez = cz + Math.sin(th) * rim[a];
+    topY.push(Math.max(1.0, field.heightAt(ex, ez)));
   }
-
-  // --- 2. underside skirt: rings from the coast rim tapering down to a keel ---
-  const RINGS = 16;
-  const depth = 260 + half * 0.35;
-  const profileR = (u) => Math.max(0.05, (1 - u) * (1 + 0.28 * Math.sin(u * Math.PI)));
-  const dropY = (u) => 1 - depth * Math.pow(u, 1.28);
 
   const H = [], X = [], Z = [];
   for (let ri = 0; ri <= RINGS; ri++) {
@@ -49,12 +47,12 @@ export function buildFlying(field, half, seed) {
     for (let ai = 0; ai <= SEG; ai++) {
       const a = ai % SEG;
       const th = (ai / SEG) * Math.PI * 2;
-      // jagged rock: wobble radius + height with cheap hashed noise
-      const jag = (hash2(ri, a) - 0.5);
+      const jag = (hash2((rand + ri) | 0, a) - 0.5);
       const rr = rim[a] * profileR(u) * (1 + jag * 0.16 * u);
-      hr.push(dropY(u) + jag * 26 * u * (1 - u));
-      xr.push(Math.cos(th) * rr);
-      zr.push(Math.sin(th) * rr);
+      const y = topY[a] * (1 - easeU(u)) + (-depth) * easeU(u) + jag * 24 * u * (1 - u);
+      hr.push(y);
+      xr.push(cx + Math.cos(th) * rr);
+      zr.push(cz + Math.sin(th) * rr);
     }
     H.push(hr); X.push(xr); Z.push(zr);
   }
@@ -62,21 +60,17 @@ export function buildFlying(field, half, seed) {
   const triCount = RINGS * SEG * 2;
   const positions = new Float32Array(triCount * 9);
   const colors = new Float32Array(triCount * 9);
-  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), nrm = new THREE.Vector3();
   const col = new THREE.Color();
   let o = 0;
-  const emit = (ax, ay, az, bx, by, bz, cx, cy, cz, ri, ai) => {
-    ab.set(bx - ax, by - ay, bz - az); ac.set(cx - ax, cy - ay, cz - az);
-    nrm.crossVectors(ab, ac).normalize();
+  const emit = (ax, ay, az, bx, by, bz, cx2, cy, cz2, ri, ai) => {
     const my = (ay + by + cy) / 3;
-    // colour by depth: mossy dirt at the rim, rock below, near-black at the keel
     if (my > -18) col.copy(DIRT).lerp(MOSS, hash2(ri, ai) * 0.5);
     else col.copy(ROCK).lerp(ROCK_D, Math.min(1, (-my) / 160));
     if (my < -170) col.lerp(DEEP, Math.min(1, (-my - 170) / 160));
     col.offsetHSL(0, 0, (hash2(ri * 3, ai) - 0.5) * 0.06);
     positions[o] = ax; positions[o + 1] = ay; positions[o + 2] = az;
     positions[o + 3] = bx; positions[o + 4] = by; positions[o + 5] = bz;
-    positions[o + 6] = cx; positions[o + 7] = cy; positions[o + 8] = cz;
+    positions[o + 6] = cx2; positions[o + 7] = cy; positions[o + 8] = cz2;
     for (let v = 0; v < 3; v++) { colors[o + v * 3] = col.r; colors[o + v * 3 + 1] = col.g; colors[o + v * 3 + 2] = col.b; }
     o += 9;
   };
@@ -86,7 +80,6 @@ export function buildFlying(field, half, seed) {
       const x10 = X[ri][ai + 1], z10 = Z[ri][ai + 1], y10 = H[ri][ai + 1];
       const x01 = X[ri + 1][ai], z01 = Z[ri + 1][ai], y01 = H[ri + 1][ai];
       const x11 = X[ri + 1][ai + 1], z11 = Z[ri + 1][ai + 1], y11 = H[ri + 1][ai + 1];
-      // wind so normals face outward/down
       emit(x00, y00, z00, x10, y10, z10, x01, y01, z01, ri, ai);
       emit(x10, y10, z10, x11, y11, z11, x01, y01, z01, ri, ai);
     }
@@ -95,33 +88,73 @@ export function buildFlying(field, half, seed) {
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  const under = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    vertexColors: true, flatShading: true, roughness: 1, metalness: 0,
-  }));
-  under.name = 'flying-underside';
-  group.add(under);
+  return geo;
+}
 
-  // --- 3. cloud sea: soft sprites over a big disc just below the coastline ---
+export function buildFlying(field, half, seed, opts = {}) {
+  const group = new THREE.Group();
+  group.name = 'flying';
+  const rand = mulberry32((seed ^ 0xf1a1) >>> 0);
+  const rockMat = new THREE.MeshStandardMaterial({
+    vertexColors: true, flatShading: true, roughness: 1, metalness: 0,
+  });
+
+  // --- 1. rocky undersides ---
+  const islands = opts.islands && opts.islands.rims && opts.islands.rims.length
+    ? opts.islands.rims
+    : null;
+
+  if (islands) {
+    // archipelago: one skirt per carved island, hugging its own edge
+    let s = 0;
+    for (const isl of islands) {
+      const depth = 150 + (isl.R || 160) * 0.75;
+      const geo = makeSkirt(field, isl.x, isl.z, isl.rim, depth, (seed ^ (0x51 * (s + 1))) >>> 0);
+      const m = new THREE.Mesh(geo, rockMat);
+      m.name = 'flying-underside';
+      group.add(m);
+      s++;
+    }
+  } else {
+    // legacy single flying island: sample the whole coastline as one rim
+    const SEG = 84, maxR = half * 0.95, rim = [];
+    for (let a = 0; a < SEG; a++) {
+      const th = (a / SEG) * Math.PI * 2;
+      const cx = Math.cos(th), cz = Math.sin(th);
+      let r = 60;
+      for (let rr = maxR; rr > 40; rr -= 10) {
+        if (field.heightAt(cx * rr, cz * rr) > 1.5) { r = rr + 8; break; }
+      }
+      rim.push(r);
+    }
+    const geo = makeSkirt(field, 0, 0, rim, 260 + half * 0.35, seed >>> 0);
+    const m = new THREE.Mesh(geo, rockMat);
+    m.name = 'flying-underside';
+    group.add(m);
+  }
+
+  // --- 2. cloud sea: soft sprites filling the sky below/between the islands ---
   const tex = makeCloudTexture();
   const bank = new THREE.Group();
-  const N = 240;
+  const N = islands ? 300 : 240;
+  const spreadR = half * (islands ? 1.7 : 2.0);
   for (let i = 0; i < N; i++) {
     const th = rand() * Math.PI * 2;
-    // start AT the coastline (so the leftover flat ocean ring is blanketed) and
-    // spread outward to the horizon, sitting just below the coast.
-    const base = rim[Math.floor((th / (Math.PI * 2)) * SEG) % SEG];
-    const rr = base * (0.9 + Math.pow(rand(), 0.5) * 1.9);
+    const rr = Math.pow(rand(), 0.5) * spreadR;
     const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false,
-      opacity: 0.5 + rand() * 0.4, color: 0xffffff, fog: true });
+      opacity: 0.42 + rand() * 0.42, color: 0xffffff, fog: true });
     const sp = new THREE.Sprite(m);
-    const w = 200 + rand() * 380;
-    sp.scale.set(w, w * 0.6, 1);
-    sp.position.set(Math.cos(th) * rr, -6 - rand() * 46, Math.sin(th) * rr);
+    const w = 220 + rand() * 420;
+    sp.scale.set(w, w * 0.58, 1);
+    // sit well below the island bases, with a few higher wisps threading the gaps
+    const low = -70 - rand() * 190;
+    const wisp = -8 - rand() * 30;
+    sp.position.set(Math.cos(th) * rr, rand() < 0.22 ? wisp : low, Math.sin(th) * rr);
     bank.add(sp);
   }
   group.add(bank);
 
-  group.visible = false;             // shown only when the flying theme is active
+  group.visible = false;             // shown only when the flying mode is active
   return {
     group,
     setVisible(v) { group.visible = v; },

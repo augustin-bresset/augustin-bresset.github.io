@@ -16,6 +16,7 @@ import { buildVolcano } from './bricks/volcano.js';
 import { buildClouds } from './bricks/clouds.js';
 import { buildFlying } from './bricks/flying.js';
 import { smoothstep, mulberry32 } from './gen/noise.js';
+import { buildIslandField } from './gen/islands.js';
 import { ACTIVE } from './themes.js';
 import { CITIES } from './cities/registry.js';
 import { placeCities } from './cities/placement.js';
@@ -110,12 +111,34 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
     }
   }
 
+  // 4c. FLYING ARCHIPELAGO (?mode=floating): carve the continent into SEPARATE
+  // floating islands — one blob of land per settlement (+ the volcano). The field
+  // masks the terrain (sky between islands), culls scatter that would float in the
+  // void, clips rivers to the land, and hands each island a coastline rim so the
+  // flying rig can hang a matching rocky underside. Null in the grounded modes.
+  let islandField = null;
+  if (cfg.flying) {
+    const anchors = cityPads.map((p) => ({ x: p.x, z: p.z }));
+    if (volcanoPad) anchors.push({ x: volcanoPad.x, z: volcanoPad.z });
+    islandField = buildIslandField(field, anchors, seed);
+    hydro.rivers = clipLinesToIslands(hydro.rivers, islandField, 4);
+    if (hydro.ravine) {
+      const rav = clipLinesToIslands([hydro.ravine], islandField, 6)[0] || null;
+      hydro.ravine = rav;
+    }
+  }
+
   // 5. slope + scatter
   const slope = computeSlope(field);
   const scatter = planScatter(field, slope, hydro, seed, exclusions);
+  if (islandField) {
+    scatter.trees = scatter.trees.filter((t) => islandField.atWorld(t.x, t.z));
+    scatter.rocks = scatter.rocks.filter((r) => islandField.atWorld(r.x, r.z));
+  }
 
-  // 6. terrain mesh (its edge is far past the fog + the camera clamp)
-  const terrain = buildTerrainMesh(field);
+  // 6. terrain mesh (its edge is far past the fog + the camera clamp; in the
+  // archipelago, masked cells collapse to nothing so only the islands remain)
+  const terrain = buildTerrainMesh(field, islandField ? { cellVisible: islandField.cellVisible } : {});
   group.add(terrain.mesh);
 
   // 6b. scenic orientation: face the home camera toward the tallest distant terrain
@@ -172,7 +195,7 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // island, a cloud sea replaces the ocean, and the sea plane is hidden. Built only
   // for floating worlds. See bricks/flying.js.
   if (cfg.flying) {
-    const flying = buildFlying(field, cfg.half, seed);
+    const flying = buildFlying(field, cfg.half, seed, { islands: islandField });
     group.add(flying.group);
     flying.setVisible(true);
     sea.mesh.visible = false;        // no ocean under a floating island
@@ -226,6 +249,27 @@ function pastelizeCities(cityList) {
       }
     });
   }
+}
+
+// Clip river/ravine polylines to the archipelago: keep each line's LONGEST run of
+// points that sit on island land, dropping runs shorter than `minLen` — so no water
+// ribbon is left hanging in the sky over a masked gap.
+function clipLinesToIslands(lines, islandField, minLen) {
+  const out = [];
+  for (const line of lines) {
+    let best = null, run = [];
+    const flush = () => {
+      if (run.length >= minLen && (!best || run.length > best.length)) best = run;
+      run = [];
+    };
+    for (const p of line) {
+      if (islandField.atWorld(p.x, p.z)) run.push(p);
+      else flush();
+    }
+    flush();
+    if (best) out.push(best);
+  }
+  return out;
 }
 
 // Angle (world XZ) of the tallest distant terrain — sampled on a mid-far ring that
