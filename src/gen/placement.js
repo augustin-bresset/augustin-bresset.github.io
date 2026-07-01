@@ -59,9 +59,14 @@ export function planScatter(field, slope, hydro, seed, exclusions = []) {
       }
       if (prof.rock > 0 && rand() < prof.rock) {
         const yy = field.heightAt(wx, wz);
+        // Terrain gradient so rocks.js can align boulders to the slope (gravity).
+        const gs = field.size / field.N;
+        const dhx = (field.heightAt(wx + gs, wz) - field.heightAt(wx - gs, wz)) / (2 * gs);
+        const dhz = (field.heightAt(wx, wz + gs) - field.heightAt(wx, wz - gs)) / (2 * gs);
         rocks.push({
-          x: wx, y: yy, z: wz, scale: 0.8 + rand() * 1.8,
+          x: wx, y: yy, z: wz, scale: 0.65 + rand() * 1.2,
           rot: rand() * Math.PI * 2, tint: rand(),
+          nx: dhx, nz: dhz,
         });
       }
     }

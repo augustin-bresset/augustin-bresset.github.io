@@ -11,6 +11,7 @@ import { LANG, cityLabel } from './src/lang.js';
 import { createOutline } from './src/postfx.js';
 import { ACTIVE, setTheme } from './src/themes.js';
 import { resolveWorld, nextWorld, worldName } from './src/worlds.js';
+import { portalRender } from './src/portalRender.js';
 
 const container = document.getElementById('viewport');
 
@@ -44,6 +45,17 @@ function boot() {
     ? (parseInt(urlSeed, 10) >>> 0)
     : (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
 
+  // Strip ?seed= from the URL immediately so a plain F5 always generates a fresh
+  // world. goToWorld() briefly puts the seed back to pass it to the next page load,
+  // which then strips it again — so the "same place, different style" switch works
+  // for one hop without permanently locking the seed in the address bar.
+  if (urlSeed != null) {
+    const clean = new URLSearchParams(location.search);
+    clean.delete('seed');
+    const qs = clean.toString();
+    history.replaceState(null, '', qs ? '?' + qs : location.pathname + location.hash);
+  }
+
   // initial language: ?lang= override, else browser preference (FR for francophones)
   const navLang = (navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
   LANG.current = qp.get('lang') === 'fr' ? 'fr' : qp.get('lang') === 'en' ? 'en' : navLang;
@@ -57,7 +69,7 @@ function boot() {
   // same place. This replaces the old theme toggle. ---
   const goToWorld = (key) => {
     const p = new URLSearchParams(location.search);
-    p.set('world', key); p.set('seed', String(seed)); p.set('lang', LANG.current);
+    p.set('world', key); p.set('lang', LANG.current);
     p.delete('mode'); p.delete('theme');
     location.search = p.toString();
   };
@@ -92,6 +104,9 @@ function boot() {
   }
 
   // ===================== grounded worlds: island / floating / land =====================
+  // Initialise the portal render target BEFORE buildWorld so the texture reference
+  // exists when makePortal() attaches it to the disc material inside each city build.
+  portalRender.init(stage.renderer, stage.scene);
   const worldObj = buildWorld(stage, seed, { mode: world.mode });
   stage.scene.add(worldObj.group);
 
@@ -138,6 +153,10 @@ function boot() {
   };
   syncOutline();
   stage.setRenderHook(() => {
+    // Portal window: compose the virtual camera from the player camera (same view,
+    // lifted into the sky) and render the world into the portal texture.
+    portalRender.update(rig.camera);
+    portalRender.render();
     if (ACTIVE.outline) outline.render();
     else stage.renderer.render(stage.scene, rig.camera);
   });

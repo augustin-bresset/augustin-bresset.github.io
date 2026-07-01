@@ -22,7 +22,7 @@ export const BIOMES = [
     adj: { ocean: 9, beach: 5, marsh: 2 } },
   { id: 1, key: 'beach',    name: 'Shore',     color: '#cdbf9c', height: { base: 1.2, amp: 2.2, ridged: 0, freq: 0.03 }, weight: 0.3, scatter: 'sparse',
     adj: { ocean: 5, beach: 2, plains: 3, desert: 2, savanna: 2, marsh: 2 } },
-  { id: 2, key: 'plains',   name: 'Plains',    color: '#9ba07a', height: { base: 6,  amp: 5,  ridged: 0,   freq: 0.02 }, weight: 1.0, scatter: 'sparse',
+  { id: 2, key: 'plains',   name: 'Plains',    color: '#9ba07a', height: { base: 6,  amp: 5,  ridged: 0,   freq: 0.013, gain: 0.24 }, weight: 1.0, scatter: 'sparse',
     adj: { plains: 5, forest: 4, hills: 3, savanna: 3, beach: 2, marsh: 2 } },
   { id: 3, key: 'forest',   name: 'Forest',    color: '#71815a', height: { base: 10, amp: 9,  ridged: 0,   freq: 0.018 }, weight: 0.9, scatter: 'forest',
     adj: { forest: 5, plains: 4, hills: 4, marsh: 2, mountain: 2 } },
@@ -34,7 +34,7 @@ export const BIOMES = [
     adj: { snow: 5, mountain: 5, hills: 1 } },
   { id: 7, key: 'desert',   name: 'Desert',    color: '#c8b88c', height: { base: 4,  amp: 7,  ridged: 0, freq: 0.022 }, weight: 0.45, scatter: 'sparse',
     adj: { desert: 7, savanna: 4, beach: 2, plains: 1 } },
-  { id: 8, key: 'savanna',  name: 'Savanna',   color: '#b3a878', height: { base: 8,  amp: 8,  ridged: 0, freq: 0.018 }, weight: 0.5, scatter: 'sparse',
+  { id: 8, key: 'savanna',  name: 'Savanna',   color: '#b3a878', height: { base: 8,  amp: 8,  ridged: 0, freq: 0.015, gain: 0.32 }, weight: 0.5, scatter: 'sparse',
     adj: { savanna: 5, desert: 4, plains: 3, beach: 2 } },
   { id: 9, key: 'marsh',    name: 'Marsh',     color: '#7d8467', height: { base: 1.8, amp: 2.8, ridged: 0, freq: 0.03 }, weight: 0.35, scatter: 'sparse',
     adj: { marsh: 4, plains: 2, forest: 2, ocean: 2, beach: 2 } },
@@ -50,7 +50,7 @@ export const BIOMES = [
   // plateau cap in heightmap.js → sheer cliffs top-out at a flat terracotta summit.
   // Sits naturally between desert/savanna lowlands (it's a desert feature) and never
   // touches mountains or snow.
-  { id: 11, key: 'mesa', name: 'Mesa', color: '#c47a52', height: { base: 12, amp: 40, ridged: 0.45, freq: 0.014, plateau: 30 }, weight: 0.28, scatter: 'rock',
+  { id: 11, key: 'mesa', name: 'Mesa', color: '#c47a52', height: { base: 12, amp: 40, ridged: 0.45, freq: 0.014, plateau: 30 }, weight: 0.07, scatter: 'rock',
     adj: { mesa: 3, desert: 5, savanna: 4, plains: 2, hills: 1 } },
 ];
 
@@ -123,8 +123,8 @@ export function faceColor(out, biomeId, y, slope, jitter = 0) {
 // scatter density hint per biome (0..1) for trees, plus rockiness
 export function scatterProfile(biomeId) {
   const s = BIOMES[biomeId].scatter;
-  if (s === 'forest') return { tree: 0.5, rock: 0.03 };
-  if (s === 'sparse') return { tree: 0.05, rock: 0.03 };
-  if (s === 'rock') return { tree: 0.0, rock: 0.12 };
+  if (s === 'forest') return { tree: 0.5, rock: 0.012 };
+  if (s === 'sparse') return { tree: 0.05, rock: 0.008 };
+  if (s === 'rock')   return { tree: 0.0, rock: 0.038 };
   return { tree: 0, rock: 0 };
 }

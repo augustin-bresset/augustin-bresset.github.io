@@ -42,12 +42,13 @@ export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, 
         const wk = 1 / Math.pow(Math.sqrt(e.d2) + 4, 4);
         w.push(wk); wsum += wk;
       }
-      let base = 0, amp = 0, ridged = 0, freq = 0;
+      let base = 0, amp = 0, ridged = 0, freq = 0, gain = 0;
       for (let k = 0; k < near.length; k++) {
         const wk = w[k] / wsum;
         const hp = BIOMES[near[k].s.biome].height;
-        base += wk * hp.base; amp += wk * hp.amp;
-        ridged += wk * hp.ridged; freq += wk * hp.freq;
+        base   += wk * hp.base;   amp    += wk * hp.amp;
+        ridged += wk * hp.ridged; freq   += wk * hp.freq;
+        gain   += wk * (hp.gain ?? 0.5);
       }
       const bId = near[0].s.biome;
       biome[idx(i, j)] = bId;
@@ -55,7 +56,7 @@ export function makeField(seed, { size = 1000, N = 256, mode = 'island' } = {}, 
       // warped noise sample
       const qx = wx + 18 * simWarpX.fbm(wx * 0.008 + 11, wz * 0.008 - 4, { octaves: 3 });
       const qz = wz + 18 * simWarpZ.fbm(wx * 0.008 - 7, wz * 0.008 + 3, { octaves: 3 });
-      const n = simElev.fbm(qx * freq, qz * freq, { octaves: 5, gain: 0.5 });      // [-1,1]
+      const n = simElev.fbm(qx * freq, qz * freq, { octaves: 5, gain });            // [-1,1]
       const rg = simRidge.ridged(qx * freq * 1.6, qz * freq * 1.6, { octaves: 4 }); // [0,1]
       const smooth = n * amp;
       const ridge = rg * amp;

@@ -9,6 +9,8 @@ export class CameraRig {
     this.camera = new THREE.PerspectiveCamera(
       42, container.clientWidth / container.clientHeight, 3, 3200
     );
+    this.fov  = 42;   // desired FOV (degrees) — tweened like polar/radius
+    this._fov = 42;   // smoothed/current FOV applied to camera each frame
 
     // Spherical-ish orbit around a movable target on the ground plane.
     // IMMERSIVE framing: we sit *inside* the continent so the land fills the frame
@@ -56,15 +58,17 @@ export class CameraRig {
   }
 
   // Cinematic move to a goal over `dur` seconds (eased). Disables input meanwhile.
+  // goal.fov (optional) tweens the camera field-of-view alongside position.
   focusOn(goal, dur = 1.3) {
     this.tween = {
       t: 0, dur,
-      from: { azim: this._azim, pol: this._pol, rad: this._rad, tgt: this._tgt.clone() },
+      from: { azim: this._azim, pol: this._pol, rad: this._rad, tgt: this._tgt.clone(), fov: this._fov },
       to: {
         azim: goal.azimuth ?? this._azim,
         pol: goal.polar ?? this._pol,
         rad: goal.radius ?? this._rad,
         tgt: goal.target ? goal.target.clone() : this._tgt.clone(),
+        fov: goal.fov ?? this._fov,
       },
       onDone: goal.onDone || null,
     };
@@ -76,6 +80,7 @@ export class CameraRig {
     this.focusOn({
       azimuth: this.home.azimuth, polar: this.home.polar,
       radius: this.home.radius, target: this.home.target.clone(),
+      fov: 42,    // always restore default FOV (may differ after a portal dive)
       onDone: () => { this.enabled = true; this.idleDrift = true; },
     }, dur);
   }
@@ -184,9 +189,10 @@ export class CameraRig {
       this._pol = tw.from.pol + (tw.to.pol - tw.from.pol) * e;
       this._rad = tw.from.rad + (tw.to.rad - tw.from.rad) * e;
       this._tgt.lerpVectors(tw.from.tgt, tw.to.tgt, e);
+      this._fov = tw.from.fov + (tw.to.fov - tw.from.fov) * e;
       // keep desired state synced so post-tween input continues smoothly
       this.azimuth = this._azim; this.polar = this._pol;
-      this.radius = this._rad; this.target.copy(this._tgt);
+      this.radius = this._rad; this.target.copy(this._tgt); this.fov = this._fov;
       this.apply();
       if (tw.t >= 1) { const cb = tw.onDone; this.tween = null; if (cb) cb(); }
       return;
@@ -203,6 +209,7 @@ export class CameraRig {
     this._pol += (this.polar - this._pol) * k;
     this._rad += (this.radius - this._rad) * k;
     this._tgt.lerp(this.target, k);
+    this._fov += (this.fov - this._fov) * k;
     this.apply();
   }
 
@@ -213,5 +220,9 @@ export class CameraRig {
     const z = this._tgt.z + this._rad * sinPol * Math.cos(this._azim);
     this.camera.position.set(x, y, z);
     this.camera.lookAt(this._tgt);
+    if (this._fov !== this.camera.fov) {
+      this.camera.fov = this._fov;
+      this.camera.updateProjectionMatrix();
+    }
   }
 }
