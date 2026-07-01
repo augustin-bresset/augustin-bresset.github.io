@@ -12,8 +12,14 @@ function hash2(i, j) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-export function buildTerrainMesh(field) {
+// opts.cellVisible(i,j) — optional per-cell mask (floating/archipelago mode): a cell
+// that fails the test is collapsed to a degenerate (zero-area) triangle so it renders
+// nothing, carving the continent into separate floating islands with sky between them.
+// (flatShading computes normals in-shader from position derivatives, so degenerate
+// faces are safe — the vertex-normal buffer is unused.)
+export function buildTerrainMesh(field, opts = {}) {
   const { N, heights, biome, idx, gx, gz } = field;
+  const cellVisible = opts.cellVisible || (() => true);
   const triCount = N * N * 2;
   const positions = new Float32Array(triCount * 3 * 3);
   const colors = new Float32Array(triCount * 3 * 3);
@@ -64,6 +70,14 @@ export function buildTerrainMesh(field) {
       const x0 = gx(i), x1 = gx(i + 1), z0 = gz(j), z1 = gz(j + 1);
       const y00 = heights[idx(i, j)], y10 = heights[idx(i + 1, j)];
       const y01 = heights[idx(i, j + 1)], y11 = heights[idx(i + 1, j + 1)];
+      // masked cell → both triangles collapse onto one point (invisible)
+      if (!cellVisible(i, j)) {
+        for (let v = 0; v < 18; v += 3) {
+          positions[o + v] = x0; positions[o + v + 1] = y00; positions[o + v + 2] = z0;
+        }
+        o += 18;
+        continue;
+      }
       const tris = [
         [x0, y00, z0, x0, y01, z1, x1, y10, z0],
         [x1, y10, z0, x0, y01, z1, x1, y11, z1],
