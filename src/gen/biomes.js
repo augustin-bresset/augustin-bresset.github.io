@@ -94,8 +94,15 @@ export function faceColor(out, biomeId, y, slope, jitter = 0) {
   if (slope > 0.6 && biomeId !== BIOME.OCEAN) {
     out.lerp(_c.set('#867f72'), clamp((slope - 0.6) * 1.8, 0, 0.6));
   }
-  // snow caps on very high ground
-  if (y > 60) out.lerp(_c.set('#e6e1d4'), clamp((y - 60) / 18, 0, 0.8));
+  // SNOW on high mountains: a snow-line that starts partway up the peaks and
+  // deepens toward the summits (near-solid white on the tops). Only true cliffs
+  // shed it, so ridges read as snow-streaked alpine rock. Never on the volcano's
+  // hot dark scrubland.
+  if (y > 38 && biomeId !== BIOME.VOLCANIC) {
+    const line = clamp((y - 38) / 22, 0, 1);          // 38 → dusting, 60 → full cap
+    const cling = 1 - clamp((slope - 0.74) * 2.4, 0, 0.6); // only sheer cliffs bare
+    out.lerp(_c.set('#f3f5f0'), Math.min(0.96, line * (0.55 + 0.45 * line)) * cling);
+  }
   // subtle facet jitter
   if (jitter) out.offsetHSL(0, 0, jitter);
   // desaturate toward the active theme's paper tone (the "brouillon" muting) — the

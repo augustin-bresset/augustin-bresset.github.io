@@ -85,6 +85,25 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
     const py = flattenPlateau(field, site.x, site.z, padR);
     exclusions.push({ x: site.x, z: site.z, r: padR + 6 });
     volcanoPad = { x: site.x, y: py, z: site.z, scale: vscale, padR };
+
+    // rivers must not run through the volcano (the flat pad would otherwise pull
+    // flow straight across the crater). Truncate any river/ravine at its first
+    // entry into the cone's footprint — it reads as "swallowed" by the lava field
+    // rather than pouring out of the summit.
+    const vr2 = (padR + 14) * (padR + 14);
+    const clipAtVolcano = (line) => {
+      let cut = line.length;
+      for (let i = 0; i < line.length; i++) {
+        const dx = line[i].x - site.x, dz = line[i].z - site.z;
+        if (dx * dx + dz * dz < vr2) { cut = i; break; }
+      }
+      return line.slice(0, cut);
+    };
+    hydro.rivers = hydro.rivers.map(clipAtVolcano).filter((l) => l.length >= 4);
+    if (hydro.ravine) {
+      const rav = clipAtVolcano(hydro.ravine);
+      hydro.ravine = rav.length >= 6 ? rav : null;
+    }
   }
 
   // 5. slope + scatter
