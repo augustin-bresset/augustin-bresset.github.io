@@ -12,7 +12,7 @@ export const CITY_LABELS = {
   apairo: (l) => l === 'fr' ? ['Apairo', 'Données Robotique'] : ['Apairo', 'Robotics Data'],
   toaster: (l) => l === 'fr' ? ['Toaster', 'Annotation 3D'] : ['Toaster', '3D Annotation'],
   splasher: (l) => l === 'fr' ? ['Splasher', 'Étiquetage BEV'] : ['Splasher', 'BEV Labeling'],
-  about: (l) => l === 'fr' ? ['Augustin', "L'Inventeur"] : ['Augustin', 'The Inventor'],
+  about: (l) => l === 'fr' ? ['Origin', "L'Inventeur"] : ['Origin', 'The Inventor'],
 };
 
 // each settlement's signature accent (portal/label/legend), so the legend dot, the
@@ -54,13 +54,6 @@ export const POIS = {
     } : {
       kicker: 'Experience · 2025', title: 'Rubicon · Bangkok',
       body: 'Software engineering intern: full ERP migration to Odoo 18 for ~40 staff, 10+ custom modules and automated data-import pipelines.',
-    },
-    climb: (l) => l === 'fr' ? {
-      kicker: 'Hors du code', title: "Le Mur d'Escalade",
-      body: "Escalade, randonnée, piano, cinéma et littérature. La ville du vent est bâtie comme il aime les problèmes : légère, modulaire, un brin improvisée.",
-    } : {
-      kicker: 'Off the clock', title: 'The Climbing Wall',
-      body: 'Climbing, hiking, piano, cinema and literature. The wind-city is built the way he likes problems — light, modular, a little improvised.',
     },
     contact: (l) => l === 'fr' ? {
       kicker: 'Dire bonjour', title: 'Augustin Bresset',

@@ -134,46 +134,10 @@ export function build() {
   const g = new THREE.Group();
 
   g.add(platform(44, 0xb6a07e));
-  // a sparse warm hamlet on the OUTER ring only, so the campus + cliff read clearly
+  // a sparse warm hamlet on the OUTER ring only, so the campus + towers read clearly
   g.add(sprawl({ rInner: 21, rOuter: 42, count: 24, seed: 44,
     colors: [0xcdbf9c, 0xb89a6e, 0x9a8468, 0x7a5230, 0xd8c9a8],
     lit: { color: WARM, p: 0.4 }, maxH: 6 }));
-
-  // ===== the climbing cliff (escalade) — a central craggy landmark =====
-  const cliff = new THREE.Group(); cliff.position.set(-9, 0, -2); g.add(cliff); tagPOI(cliff, 'climb');
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0xa3937b, flatShading: true, roughness: 1 });
-  const rockMat2 = new THREE.MeshStandardMaterial({ color: 0x8c7e69, flatShading: true, roughness: 1 });
-  // main tower + buttresses + an overhang slab → a rocky, non-boxy silhouette
-  const chunks = [[8, 17, 6, 0, 8.5, 0, 0.0, rockMat], [4.5, 11, 4, -4, 5.5, 1.5, 0.2, rockMat2],
-    [4, 8, 5, 3.5, 4, -1.5, -0.15, rockMat2], [5, 4, 5, 1.5, 14.5, 1, 0.3, rockMat2]];
-  for (const [w, h, d, x, y, z, rot, mat] of chunks) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(x, y, z); m.rotation.y = (x + z) * 0.05; m.rotation.z = rot * 0.18;
-    m.castShadow = true; m.receiveShadow = true; cliff.add(m);
-  }
-  // a pointed rocky peak so it reads as a crag, not a building
-  const peak = new THREE.Mesh(new THREE.ConeGeometry(3.2, 5, 6), rockMat);
-  peak.position.set(0.5, 18.5, 0.3); peak.rotation.y = 0.4; peak.castShadow = true; cliff.add(peak);
-
-  // colourful climbing holds dotted up TWO faces (+x and +z) so a route always shows
-  const holdCols = [0xd9534f, 0x4a90d9, 0xe6b800, 0x57a957];
-  for (let i = 0; i < 12; i++) {
-    const hy = 2.2 + Math.floor(i / 2) * 1.5;
-    // +z face (face at z = +3)
-    cliff.add(box(0.42, 0.42, 0.42, holdCols[i % 4], { pos: [-2.6 + (i % 4) * 1.5, hy, 3.15], cast: false }));
-    // +x face (face at x = +4)
-    cliff.add(box(0.42, 0.42, 0.42, holdCols[(i + 2) % 4], { pos: [4.15, hy + 0.6, -2.0 + (i % 4) * 1.4], cast: false }));
-  }
-  // a belay rope down the +z face
-  const rope = cyl(0.05, 0.05, 14, ROPE, 4, { pos: [0.6, 9, 3.25] }); cliff.add(rope);
-  // a tiny climber on the +z face (body + pack + helmet)
-  const climber = new THREE.Group(); climber.position.set(0.4, 8, 3.4); cliff.add(climber);
-  climber.add(box(0.5, 0.85, 0.32, 0x3a5f8a, { pos: [0, 0, 0] }));
-  climber.add(box(0.52, 0.5, 0.26, RUST, { pos: [0, 0.55, -0.05] }));
-  climber.add(box(0.34, 0.34, 0.34, 0xe7d8bd, { pos: [0, 1.0, 0] }));
-  // summit banner
-  const banner = box(0.08, 1.8, 0.08, WOOD, { pos: [0.5, 21.5, 0.3] }); cliff.add(banner);
-  const flagTop = box(0.06, 1.1, 1.7, RUST, { pos: [0.5, 21.9, 1.1] }); cliff.add(flagTop);
 
   // ===== wooden wind-towers + a rope bridge =====
   const towers = [[10, 6, 18], [16, -7, 14], [2, 13, 16]];
@@ -253,14 +217,13 @@ export function build() {
   addBeacon('telecom', '#3a7ca5', -9, 13, -12);
   addBeacon('ensta', '#6b9a47', -1, 13, -13.5);
   addBeacon('rubicon', '#d4a84b', 6, 15, -11);
-  addBeacon('climb', '#c4763a', -8.5, 25, -1.7);
   addBeacon('contact', '#8b6845', 17, 9.5, 2);
 
   // ===== portal back to the map =====
   const portal = makePortal('#c4763a');
   portal.group.position.set(13, 0, 11); g.add(portal.group);
 
-  const label = makeLabel('Augustin', 'The Inventor', '#c4763a');
+  const label = makeLabel('Origin', 'The Inventor', '#c4763a');
   label.sprite.position.set(0, 38, 0); g.add(label.sprite);
 
   tagPickable(g, 'about');
@@ -298,9 +261,6 @@ export function build() {
         k.tether.rotation.x = -Math.atan2(dz, dy);
       }
       for (const s of spinners) s.hub.rotation.z = t * s.sp;
-      // banner + climber gentle sway
-      flagTop.rotation.x = Math.sin(t * 3) * 0.18;
-      climber.position.y = 8 + Math.sin(t * 0.6) * 0.4;
     },
   };
 }
