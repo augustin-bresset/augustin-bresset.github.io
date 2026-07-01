@@ -25,6 +25,9 @@ export function createOutline(renderer, scene, getCamera, container) {
       uStrength: { value: 0.55 },
       uThresh: { value: 0.4 },
       uInk: { value: new THREE.Color('#2a1808') },
+      uDesat: { value: 0 },           // sketch: pull whole frame toward greyscale
+      uWash: { value: 0 },            // sketch: tint whole frame toward paper
+      uPaper: { value: new THREE.Color('#efe9db') },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -35,6 +38,7 @@ export function createOutline(renderer, scene, getCamera, container) {
       uniform sampler2D tDiffuse; uniform sampler2D tDepth;
       uniform vec2 uTexel; uniform float uNear, uFar, uStrength, uThresh;
       uniform vec3 uInk;
+      uniform float uDesat, uWash; uniform vec3 uPaper;
       float lin(float z){
         float ndc = z * 2.0 - 1.0;
         return (2.0 * uNear * uFar) / (uFar + uNear - ndc * (uFar - uNear));
@@ -49,7 +53,12 @@ export function createOutline(renderer, scene, getCamera, container) {
         float diff = max(max(abs(d-dl), abs(d-dr)), max(abs(d-du), abs(d-dd)));
         // scale by depth so distant silhouettes aren't over-inked
         float edge = smoothstep(uThresh, uThresh * 3.0, diff / max(d, 1.0) * 8.0);
-        vec3 outc = mix(col.rgb, uInk, edge * uStrength);
+        // sketch wash: desaturate + tint the WHOLE frame toward paper (so trees and
+        // even the neon cities read as one croquis), then ink the silhouette edges.
+        float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+        vec3 base = mix(col.rgb, vec3(lum), uDesat);
+        base = mix(base, uPaper, uWash);
+        vec3 outc = mix(base, uInk, edge * uStrength);
         gl_FragColor = vec4(outc, 1.0);
       }
     `,
@@ -71,6 +80,11 @@ export function createOutline(renderer, scene, getCamera, container) {
   return {
     setStrength(s) { mat.uniforms.uStrength.value = s; },
     setInk(c) { mat.uniforms.uInk.value.set(c); },
+    setWash(desat, wash, paper) {
+      mat.uniforms.uDesat.value = desat;
+      mat.uniforms.uWash.value = wash;
+      if (paper) mat.uniforms.uPaper.value.set(paper);
+    },
     render() {
       const cam = getCamera();
       mat.uniforms.uNear.value = cam.near;
