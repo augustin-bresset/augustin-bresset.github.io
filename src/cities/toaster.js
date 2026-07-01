@@ -117,6 +117,9 @@ export function build() {
 
   return {
     group: g, label,
+    // dive-in framing: centre on the holographic annotation stage with the neon
+    // skyline rising around it (fixed, so it's the same hero shot on every seed).
+    frame: { target: [0, 7, 0], azimuth: 0.6, polar: 57, radius: 64 },
     pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
     update(t, dt) {
       portal.update(t);

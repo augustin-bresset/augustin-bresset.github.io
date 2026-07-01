@@ -136,6 +136,9 @@ export function build() {
 
   return {
     group: g, label,
+    // dive-in framing: pull in close on the factory core (hall + silos + conveyor)
+    // so the data-plant reads instead of the grey outer sprawl.
+    frame: { target: [-2, 6, 1], azimuth: 0.7, polar: 52, radius: 64 },
     pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
     update(t, dt) {
       portal.update(t);

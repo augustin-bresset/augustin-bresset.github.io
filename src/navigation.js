@@ -152,8 +152,21 @@ export class Navigation {
   }
 
   // ---- diving ------------------------------------------------------------
-  // close 3/4 view, settlement centred (no panel to dodge anymore).
+  // close 3/4 view onto the settlement. A city may declare a `frame` hint so the
+  // dive centres on its hero cluster from a flattering, hand-picked angle (cities
+  // are placed but never rotated, so a local target offset + a world azimuth are
+  // stable). Without one, fall back to a centred view from the island-inward side.
   _goal(city) {
+    const f = city.frame;
+    if (f) {
+      const target = city.worldPos.clone().add(
+        new THREE.Vector3(f.target[0], f.target[1], f.target[2]));
+      return {
+        target, azimuth: f.azimuth,
+        polar: THREE.MathUtils.degToRad(f.polar),
+        radius: f.radius,
+      };
+    }
     const az = Math.atan2(city.worldPos.x, city.worldPos.z) + Math.PI;
     const R = city.radius || 36;
     const target = city.worldPos.clone();

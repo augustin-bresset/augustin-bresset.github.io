@@ -267,6 +267,10 @@ export function build() {
 
   return {
     group: g, label,
+    // dive-in framing: centre on the school campus (the -z corner) from its front,
+    // raised 3/4, so the four colour-coded schools read clearly with the wind-city
+    // rising behind them.
+    frame: { target: [-4, 4, -10], azimuth: 3.3, polar: 56, radius: 56 },
     pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
     update(t, dt) {
       portal.update(t);
