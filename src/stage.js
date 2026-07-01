@@ -26,7 +26,10 @@ export function createStage(container) {
     alpha: false,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // phones: cap the pixel ratio lower — 3× DPR screens would render 9× the pixels
+  // of the desktop budget for no visible gain at arm's length
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;

@@ -8,7 +8,7 @@
 import { makeSites } from '../src/gen/voronoi.js';
 import { growBiomes } from '../src/gen/biomeGrowth.js';
 import { makeField, WATER_Y } from '../src/gen/heightmap.js';
-import { BIOME } from '../src/gen/biomes.js';
+import { BIOME, BIOMES, BY_KEY } from '../src/gen/biomes.js';
 
 const SEEDS = [1, 3, 5, 7, 11, 21, 42, 100, 777, 2024];
 const SIZE = 1600, SPACING = 54, N = 192;   // island preset (default mode); N lower for speed
@@ -94,10 +94,20 @@ function analyze(seed) {
     oceanSites, landSites,
     topBiome, biomeShare: landSites ? topCount / landSites : 0,
     volcanoes: volc.length, volcanoInMassif,
+    trend: graph.trend,
   };
 }
 
 let failed = 0;
+
+// ---- static checks on the biome table itself (catch typos in new biome defs) ----
+for (const b of BIOMES) {
+  for (const k in b.adj) {
+    if (!BY_KEY[k]) { console.log(`  FAIL biome '${b.key}' adj references unknown biome '${k}'`); failed++; }
+  }
+  if (!(b.moist >= 0 && b.moist <= 1)) { console.log(`  FAIL biome '${b.key}' has no valid moist`); failed++; }
+  if (BIOMES[b.id] !== b) { console.log(`  FAIL biome '${b.key}' id ${b.id} does not match its index`); failed++; }
+}
 console.log(`gen invariants · ${SEEDS.length} seeds · N=${N}\n`);
 for (const seed of SEEDS) {
   const a = analyze(seed);
@@ -111,6 +121,7 @@ for (const seed of SEEDS) {
   const bad = checks.filter(([, ok]) => !ok);
   const tag = bad.length ? 'FAIL' : 'ok  ';
   console.log(`  ${tag} seed ${String(seed).padStart(4)}  ` +
+    `trend ${String(a.trend).padEnd(9)} · ` +
     `land ${(a.landFrac * 100).toFixed(0)}% · continent ${(a.dominant * 100).toFixed(0)}% · ` +
     `top ${BIOME_NAME[a.topBiome] || '—'} ${(a.biomeShare * 100).toFixed(0)}% · ` +
     `volc ${a.volcanoes}`);

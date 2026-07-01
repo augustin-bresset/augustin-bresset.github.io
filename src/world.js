@@ -38,7 +38,12 @@ const PRESETS = {
 };
 
 export function buildWorld(stage, seed, { mode = 'island' } = {}) {
-  const cfg = PRESETS[mode] || PRESETS.island;
+  const preset = PRESETS[mode] || PRESETS.island;
+  // MOBILE preset: coarse-pointer devices get a lighter heightfield grid — same
+  // world (biomes/rivers/cities are resolution-independent), ~2× fewer triangles.
+  const coarse = typeof window !== 'undefined' && window.matchMedia &&
+    window.matchMedia('(pointer: coarse)').matches;
+  const cfg = coarse ? { ...preset, N: Math.round(preset.N * 0.7) } : preset;
   const group = new THREE.Group();
   const updaters = [];
   const cities = [];
@@ -53,12 +58,26 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // 3. rivers carve the heightfield before meshing
   const hydro = carveRivers(field, seed);
 
-  // 4. place project cities (link-based; needs biomes placed first)
-  const placements = placeCities(field, graph, seed, CITIES);
+  // 4. place project cities (link-based; needs biomes placed first, and hydrology
+  // so cities keep clear of rivers instead of straddling them)
+  const placements = placeCities(field, graph, seed, CITIES, hydro);
   const cityPads = placements.map((p) => ({
     city: p.city, x: p.x, z: p.z, y: flattenPlateau(field, p.x, p.z, p.city.radius),
   }));
   const exclusions = cityPads.map((p) => ({ x: p.x, z: p.z, r: p.city.radius + 6 }));
+
+  // 4a. any river that still crosses a city pad is SPLIT around it: the ribbon stops
+  // at the pad edge and re-emerges on the far side (reads as slipping under the
+  // settlement) instead of shooting flat across the raised plateau. The ravine keeps
+  // its single longest clear run — a chasm through a city would be worse than a gap.
+  const padZones = cityPads.map((p) => ({ x: p.x, z: p.z, r: p.city.radius + 10 }));
+  hydro.rivers = splitLinesAroundZones(hydro.rivers, padZones, 4);
+  if (hydro.ravine) {
+    const runs = splitLinesAroundZones([hydro.ravine], padZones, 6);
+    hydro.ravine = runs.length
+      ? runs.reduce((a, b) => (b.length > a.length ? b : a))
+      : null;
+  }
 
   // 4b. the lone volcano: pick the most CENTRAL volcanic site (most volcanic
   // neighbours, away from any mountain/snow & the map edge), flatten a pad so the
@@ -254,6 +273,32 @@ function pastelizeCities(cityList) {
       }
     });
   }
+}
+
+// Split polylines around circular exclusion zones (city pads): each line becomes
+// the list of its contiguous runs OUTSIDE every zone, dropping runs shorter than
+// minLen. Unlike clipLinesToIslands this keeps ALL runs, so a river that crosses a
+// pad re-emerges downstream instead of vanishing.
+function splitLinesAroundZones(lines, zones, minLen) {
+  const inside = (p) => {
+    for (const z of zones) {
+      const dx = p.x - z.x, dz = p.z - z.z;
+      if (dx * dx + dz * dz < z.r * z.r) return true;
+    }
+    return false;
+  };
+  const out = [];
+  for (const line of lines) {
+    let run = [];
+    for (const p of line) {
+      if (inside(p)) {
+        if (run.length >= minLen) out.push(run);
+        run = [];
+      } else run.push(p);
+    }
+    if (run.length >= minLen) out.push(run);
+  }
+  return out;
 }
 
 // Clip river/ravine polylines to the archipelago: keep each line's LONGEST run of

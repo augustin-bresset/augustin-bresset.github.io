@@ -38,6 +38,11 @@ html, body {
   background: var(--parchment);
   cursor: grab;
   user-select: none;
+  /* claim ALL touch gestures for the map: without this the browser hijacks
+     one-finger drags (scroll / pull-to-refresh) and pinches (page zoom), which is
+     what makes touch navigation feel broken on phones. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #viewport canvas {
@@ -399,6 +404,29 @@ body.theme-sketch #vignette {
     padding: 0.5rem 0.5rem 0.4rem;
   }
   .legend-name { font-size: 1.05rem; }
+}
+
+/* Touch devices: finger-sized targets (44px Apple HIG floor) regardless of screen
+   width — a tablet is wide but still needs fat buttons. */
+@media (pointer: coarse) {
+  .ui-btn {
+    min-height: 44px;
+    padding: 0.55rem 1rem;
+    font-size: 1rem;
+  }
+  .legend-item {
+    padding: 0.55rem 0.6rem;
+    min-height: 44px;
+  }
+  .note-close {
+    width: 44px;
+    height: 44px;
+    font-size: 1.6rem;
+  }
+  .note-link {
+    display: inline-block;
+    padding: 0.5rem 0.2rem;
+  }
 }
 
 /* ── WebGL fallback ───────────────────────────────────────── */

@@ -1,153 +1,252 @@
-// splasher.js — Splasher: synchronized multi-sensor BEV labeling (LiDAR + cameras
-// + bird's-eye grid). Reimagined as a cyberpunk sensor lab: a dark blue-teal
-// district around a holographic BEV TABLE that re-creates the real tool — a
-// top-down grid with an ego car, neon vehicle bounding boxes, lane lines and a
-// radial scan sweep, flanked by camera-feed panels. Dark aqua, never pure black.
+// splasher.js — Splasher: synchronized multi-sensor BEV labeling.
+// "HEIGHTFIELD ZERO": the city literally IS the tool's output — a rigid BEV cell
+// grid where every column's HEIGHT is a lidar cell's max-z and its COLOUR is that
+// same height on the viridis ramp (purple lowlands → yellow peaks), quantised into
+// terrace steps. A black brutalist ego-origin dais (the logo's axis marker) crowns
+// the central massif and emits concentric cyan splash-rings that re-tint the cells
+// they cross to class-blue and release them — idling = watching an annotation pass.
+// A flat electric-blue traversability corridor threads forward in +x between the
+// peaks (the flagship labeling task made a street). Zero random position, zero
+// random yaw: one coherent heightfield, one lattice.
 import * as THREE from 'three';
-import { box, cyl, platform, glow, wireBox, pointCloud, makeLabel, makePortal, poiBeacon, tagPOI, tagPickable, sprawl } from './kit.js';
+import { box, cyl, glow, wireBox, pointCloud, makeLabel, makePortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
+import { Simplex, clamp, smoothstep } from '../gen/noise.js';
 
-// a flat top-down grid of glowing lines (the BEV ground)
+const N = 32, PITCH = 1.5, RMAX = 24;
+const BLUE = 0x3b82f6, BLUE_HI = 0x5b9bff, CYAN = 0x2ad4ff;
+
+// viridis ramp, floor lifted toward indigo so short cells never read black
+const VIRIDIS = [
+  new THREE.Color(0x440154).lerp(new THREE.Color(0x3b528b), 0.15),
+  new THREE.Color(0x3b528b), new THREE.Color(0x21918c),
+  new THREE.Color(0x5ec962), new THREE.Color(0xfde725),
+];
+function viridis(out, t) {
+  const f = clamp(t, 0, 1) * (VIRIDIS.length - 1);
+  const i = Math.min(VIRIDIS.length - 2, Math.floor(f));
+  return out.copy(VIRIDIS[i]).lerp(VIRIDIS[i + 1], f - i);
+}
+
+// flat glowing grid-line overlay (the BEV raster)
 function bevGrid(size, step, color) {
   const pts = [];
   const h = size / 2;
-  for (let x = -h; x <= h + 0.001; x += step) { pts.push(x, 0, -h, x, 0, h); }
-  for (let z = -h; z <= h + 0.001; z += step) { pts.push(-h, 0, z, h, 0, z); }
+  for (let x = -h; x <= h + 0.001; x += step) pts.push(x, 0, -h, x, 0, h);
+  for (let z = -h; z <= h + 0.001; z += step) pts.push(-h, 0, z, h, 0, z);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false });
-  return new THREE.LineSegments(geo, mat);
+  return new THREE.LineSegments(geo,
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false }));
 }
 
 export function build() {
   const g = new THREE.Group();
-  // dark blue-teal charcoals — nuanced, not black
-  const C1 = 0x1c2a36, C2 = 0x243744, C3 = 0x172430, C4 = 0x29404f;
-  const CYAN = 0x00d8ff, VIOLET = 0x8a5cff, HI = 0x7af0ff, AMBER = 0xffb14a;
+  const sim = new Simplex(33);
 
-  g.add(platform(50, 0x2a333b));
-  g.add(sprawl({ rInner: 19, rOuter: 50, count: 105, seed: 33,
-    colors: [C1, C2, C3, C4], lit: { color: CYAN, p: 0.62 }, maxH: 22 }));
+  // SQUARE canvas pad — the BEV viewport is a rectangle, so its pad is one too,
+  // barely larger than the grid: the city fills its ground, no black apron.
+  g.add(platformDark(50));
 
-  // skyline towers w/ cyan + violet edge light
-  const towerStrips = [];
-  const towerBodies = [];
-  for (const [x, z, h, neon] of [[-19, -13, 28, CYAN], [17, -18, 24, VIOLET],
-    [23, 11, 22, CYAN], [-23, 9, 26, VIOLET], [-4, 23, 20, CYAN]]) {
-    const tw = box(5, h, 5, C2, { pos: [x, h / 2, z], roughness: 0.5, metalness: 0.3 });
-    tw.rotation.y = (x + z) % 1.3; g.add(tw); towerBodies.push(tw);
-    for (const [ex, ez] of [[2.55, 2.55], [-2.55, 2.55], [2.55, -2.55], [-2.55, -2.55]]) {
-      const e = box(0.16, h, 0.16, neon, { emissive: neon, emissiveIntensity: 1.8, cast: false });
-      e.position.set(x + ex, h / 2, z + ez); e.rotation.y = tw.rotation.y; g.add(e); towerStrips.push(e);
+  const mastPos = { x: -16, z: 14 }, camPos = { x: 18, z: 6 };
+  const portalPos = { x: 20, z: 20 };            // pad corner, cells cleared around it
+
+  // ===== the BEV heightfield: one instanced lattice of viridis columns ==========
+  const cells = [];
+  const _v = new THREE.Vector3();
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const x = (i - N / 2 + 0.5) * PITCH, z = (j - N / 2 + 0.5) * PITCH;
+      const r = Math.hypot(x, z);
+      if (r < 3) continue;                                    // ego plaza at centre
+      if (Math.hypot(x - mastPos.x, z - mastPos.z) < 3) continue;   // sensor footprints
+      if (Math.hypot(x - camPos.x, z - camPos.z) < 3.2) continue;
+      if (Math.hypot(x - portalPos.x, z - portalPos.z) < 5) continue;  // portal clearing
+      const corridor = x > 2 && Math.abs(z) < 1.7;            // drivable channel (+x)
+      if (!corridor) {
+        if (Math.abs(x) < 0.8 || Math.abs(z) < 0.8) continue;       // N/E/S/W spoke streets
+        if (Math.abs(r - 10) < 0.8 || Math.abs(r - 18) < 0.8) continue; // ring avenues
+      }
+      // one coherent field: radial envelope × (fbm ground + ridged obstacle peaks)
+      const env = 1 - smoothstep(0.12, 1.0, r / RMAX);
+      const detail = 0.5 + 0.5 * sim.fbm(x * 0.09, z * 0.09, { octaves: 4 });
+      const ridge = sim.ridged(x * 0.05, z * 0.05, { octaves: 3 });
+      if (r > RMAX * 0.97 && detail < 0.3) continue;          // barely-thinned rim (fill the disc)
+      let hN = clamp(env * (0.35 + 0.55 * detail + 0.5 * ridge), 0, 1);
+      hN = Math.round(hN * 6) / 6;                            // 6 terrace steps
+      let h = 0.6 + hN * 17;
+      if (corridor) { h = 0.5; hN = -1; }                     // flat, class-blue
+      cells.push({ x, z, h, hN, r, corridor });
     }
   }
 
-  // ===== HERO: holographic BEV labeling table =====
-  const hero = new THREE.Group(); g.add(hero); tagPOI(hero, 'table');
-  hero.add(box(19, 1.4, 19, C3, { pos: [0, 0.7, 0], roughness: 0.4, metalness: 0.5 }));
-  // emissive ground + grid lines
-  const ground = glow(17, 17, 0x06303a, 0.55);
-  ground.rotation.x = -Math.PI / 2; ground.position.y = 1.5; hero.add(ground);
-  const grid = bevGrid(17, 1.7, CYAN); grid.position.y = 1.53; hero.add(grid);
+  // column bodies: ONE InstancedMesh, per-instance viridis colour
+  const bodyGeo = new THREE.BoxGeometry(1.25, 1, 1.25);
+  const bodies = new THREE.InstancedMesh(bodyGeo,
+    new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.55, metalness: 0.05 }),
+    cells.length);
+  // unlit brighter top-caps: light-from-within so lowlands glow instead of crushing
+  const capGeo = new THREE.BoxGeometry(1.27, 0.16, 1.27);
+  const caps = new THREE.InstancedMesh(capGeo, new THREE.MeshBasicMaterial(), cells.length);
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
+  const _col = new THREE.Color(), _white = new THREE.Color(0xffffff);
+  const baseCols = new Float32Array(cells.length * 3);        // for the splash re-tint
+  cells.forEach((c, ci) => {
+    _m.compose(_v.set(c.x, c.h / 2, c.z), _q, _s.set(1, c.h, 1));
+    bodies.setMatrixAt(ci, _m);
+    _m.compose(_v.set(c.x, c.h + 0.08, c.z), _q, _s.set(1, 1, 1));
+    caps.setMatrixAt(ci, _m);
+    if (c.corridor) _col.set(BLUE);
+    else viridis(_col, c.hN);
+    bodies.setColorAt(ci, _col);
+    baseCols[ci * 3] = _col.r; baseCols[ci * 3 + 1] = _col.g; baseCols[ci * 3 + 2] = _col.b;
+    // caps barely brighter than the body: unlit means they already render at full
+    // value — any strong white lift washes the viridis to lavender from above.
+    caps.setColorAt(ci, _col.clone().lerp(_white, 0.08));
+  });
+  bodies.castShadow = true; bodies.receiveShadow = true;
+  g.add(bodies); g.add(caps);
 
-  // ego vehicle (the recording car) at centre
-  hero.add(box(1.6, 0.7, 3, HI, { pos: [0, 2.0, 0], emissive: HI, emissiveIntensity: 1.6, cast: false }));
-  hero.add(wireBox(2.2, 1.2, 3.6, HI, { pos: [0, 2.1, 0] }));
+  // the BEV raster overlay + a faint ground-haze glow for the control-room mood
+  const grid = bevGrid(N * PITCH, PITCH, BLUE); grid.position.y = 0.06; g.add(grid);
+  const haze = glow(49, 49, 0x0d2030, 0.35);
+  haze.rotation.x = -Math.PI / 2; haze.position.y = 0.02;
+  haze.material.transparent = true; haze.material.opacity = 0.5; g.add(haze);
 
-  // labelled vehicles: flat neon boxes + a tiny point blob, varied class colours
-  const carSpecs = [
-    [-4.5, 3.2, 0.4, CYAN], [5.0, -2.0, -0.7, VIOLET], [-2.5, -5.5, 0.2, AMBER],
-    [3.5, 5.5, 1.1, CYAN], [-6.5, -3.0, 0.9, VIOLET], [6.5, 4.0, -0.4, CYAN],
-  ];
-  const cars = [];
-  for (const [x, z, rot, col] of carSpecs) {
-    const wb = wireBox(2.0, 1.2, 3.4, col, { pos: [x, 2.1, z] });
-    wb.rotation.y = rot; hero.add(wb); cars.push(wb);
-    const blob = pointCloud([{ cx: 0, cz: 0, color: col, n: 16, spread: 0.7, y: 0 }], { size: 0.16 });
-    blob.position.set(x, 2.0, z); blob.rotation.y = rot; hero.add(blob);
-  }
+  // ===== THE EGO SPLASH ORIGIN — the logo stood up at world (0,0) ===============
+  const dais = new THREE.Group(); g.add(dais); tagPOI(dais, 'table');
+  dais.add(box(4.2, 1.3, 4.2, 0x0e1117, { pos: [0, 0.65, 0], roughness: 0.4, metalness: 0.3 }));
+  dais.add(box(2.6, 0.9, 2.6, 0x14181f, { pos: [0, 1.75, 0], roughness: 0.5 }));
+  // axis monument: +X forward arm (red), +Y left arm (green), pulsing centre dot
+  dais.add(box(3.4, 0.28, 0.28, 0xff5a52, { pos: [2.2, 2.3, 0], emissive: 0xff5a52, emissiveIntensity: 1.6, cast: false }));
+  dais.add(box(0.28, 0.28, 3.4, 0x37d67a, { pos: [0, 2.3, 2.2], emissive: 0x37d67a, emissiveIntensity: 1.6, cast: false }));
+  const dot = box(0.7, 0.7, 0.7, BLUE_HI, { pos: [0, 2.5, 0], emissive: BLUE_HI, emissiveIntensity: 2.4, cast: false });
+  dais.add(dot);
 
-  // lane lines (dashed glowing segments running "forward")
-  for (const lx of [-2.6, 2.6]) {
-    for (let s = -7; s <= 7; s += 2.4) {
-      hero.add(box(0.18, 0.05, 1.2, 0xeaf6ff,
-        { pos: [lx, 1.56, s], emissive: 0xbfe9ff, emissiveIntensity: 1.0, cast: false, receive: false }));
-    }
-  }
-
-  // rotating radial scan sweep over the table
-  const sweepPivot = new THREE.Group(); sweepPivot.position.set(0, 1.7, 0); hero.add(sweepPivot);
-  const sweep = glow(8.4, 0.34, HI, 2.2);
-  sweep.rotation.x = -Math.PI / 2; sweep.position.set(4.2, 0, 0);
-  sweep.material.transparent = true; sweep.material.opacity = 0.6; sweepPivot.add(sweep);
-
-  // camera-feed panels on posts (the "multi-sensor" sync) at the back edge
-  const feeds = [];
-  for (const [x, z, col] of [[-7.5, -8.5, CYAN], [0, -9.2, VIOLET], [7.5, -8.5, CYAN]]) {
-    g.add(cyl(0.18, 0.24, 5, 0x223038, 6, { pos: [x, 2.5, z] }));
-    const scr = glow(3.4, 2.1, col, 1.2);
-    scr.position.set(x, 5.6, z);
-    scr.material.transparent = true; scr.material.opacity = 0.82; g.add(scr); feeds.push(scr);
-    // bezel
-    g.add(box(3.7, 2.4, 0.18, 0x2a3a44, { pos: [x, 5.6, z - 0.12], roughness: 0.6 }));
-  }
-
-  // rotating LiDAR scanner on a mast (Splasher signature)
-  const mast = cyl(0.22, 0.3, 7, 0x223038, 8, { pos: [11, 3.5, -3] }); g.add(mast); tagPOI(mast, 'mast');
-  const scanner = new THREE.Group(); scanner.position.set(11, 7.2, -3); g.add(scanner); tagPOI(scanner, 'mast');
-  tagPOI(towerBodies[1], 'towers');     // the violet skyline tower → "built for" note
-  scanner.add(cyl(1.4, 1.6, 1.1, C3, 16, {}));
-  const beam = glow(13, 1.0, HI, 1.6); beam.position.set(6.5, 0.2, 0); scanner.add(beam);
-
-  // ripple rings on a water pad (Splasher signature)
-  const pad = new THREE.Mesh(new THREE.CircleGeometry(8, 32),
-    new THREE.MeshStandardMaterial({ color: 0x0e2730, emissive: 0x07303a, emissiveIntensity: 0.6, roughness: 0.3, transparent: true, opacity: 0.9 }));
-  pad.rotation.x = -Math.PI / 2; pad.position.set(-12, 0.3, 6); g.add(pad);
+  // ===== splash rings — the annotation pass, emitted from the ego dot ===========
   const rings = [];
-  for (let i = 0; i < 4; i++) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.12, 6, 40),
+  for (let i = 0; i < 3; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.14, 6, 64),
       new THREE.MeshStandardMaterial({ color: CYAN, emissive: CYAN, emissiveIntensity: 1.8, transparent: true }));
-    ring.rotation.x = -Math.PI / 2; ring.position.set(-12, 0.4, 6); g.add(ring); rings.push({ ring, ph: i / 4 });
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.5;
+    g.add(ring); rings.push({ ring, ph: i / 3 });
   }
 
-  // ===== floating markers over the three readable landmarks =====
+  // ===== the corridor's scrolling dashed lane markers ===========================
+  const lanes = [];
+  for (let s = 0; s < 9; s++) {
+    const ln = box(1.1, 0.06, 0.22, 0xbfe9ff, { emissive: 0xbfe9ff, emissiveIntensity: 1.2, cast: false, receive: false });
+    ln.position.set(4 + s * 2.4, 0.62, 0); g.add(ln); lanes.push(ln);
+  }
+
+  // ===== a slow radial scan-wedge dragging a bright band across the relief ======
+  const scanPivot = new THREE.Group(); scanPivot.position.y = 0.4; g.add(scanPivot);
+  const scanW = glow(22, 0.5, CYAN, 1.6);
+  scanW.rotation.x = -Math.PI / 2; scanW.position.set(11, 0.5, 0);
+  scanW.material.transparent = true; scanW.material.opacity = 0.4;
+  scanPivot.add(scanW);
+
+  // ===== edge sensor 1: LiDAR mast + floating annotation cage → 'mast' ==========
+  const mastG = new THREE.Group(); mastG.position.set(mastPos.x, 0, mastPos.z);
+  g.add(mastG); tagPOI(mastG, 'mast');
+  mastG.add(cyl(0.24, 0.34, 7.5, 0x223038, 8, { pos: [0, 3.75, 0] }));
+  const scanner = new THREE.Group(); scanner.position.y = 7.9; mastG.add(scanner);
+  scanner.add(cyl(1.3, 1.5, 1.1, 0x172430, 16, {}));
+  const beam = glow(11, 0.9, 0x57e8ff, 1.6); beam.position.set(5.5, 0.2, 0); scanner.add(beam);
+  const cage = wireBox(3.2, 2.6, 3.2, 0x57e8ff, { opacity: 0.8, fillOpacity: 0.05 });
+  cage.position.set(0, 11.5, 0); mastG.add(cage);
+  const swarm = pointCloud([{ cx: 0, cz: 0, color: 0x57e8ff, n: 26, spread: 1.1, y: 0 }], { size: 0.16 });
+  swarm.position.set(0, 11.3, 0); mastG.add(swarm);
+
+  // ===== edge sensor 2: camera-feed bank watching the corridor → 'towers' =======
+  const camG = new THREE.Group(); camG.position.set(camPos.x, 0, camPos.z);
+  g.add(camG); tagPOI(camG, 'towers');
+  const feeds = [];
+  [[-2.6, 0x2ad4ff], [0, 0x8a5cff], [2.6, 0x2ad4ff]].forEach(([dx, col]) => {
+    camG.add(cyl(0.16, 0.22, 4.6, 0x223038, 6, { pos: [dx, 2.3, 0] }));
+    const scr = glow(2.2, 1.5, col, 1.2);
+    scr.position.set(dx, 5.1, 0); scr.rotation.y = Math.PI + 0.5;   // faces the corridor
+    scr.material.transparent = true; scr.material.opacity = 0.85;
+    camG.add(scr); feeds.push(scr);
+    camG.add(box(2.5, 1.8, 0.16, 0x2a3a44, { pos: [dx, 5.1, 0.12], roughness: 0.6 }));
+  });
+  camG.rotation.y = 0.5;
+
+  // ===== POI beacons (existing content ids stay wired) ==========================
   const pois = [];
   const addBeacon = (id, accent, x, y, z) => {
     const b = poiBeacon(accent); b.group.position.set(x, y, z); g.add(b.group);
     tagPOI(b.group, id); pois.push({ id, accent, beacon: b });
   };
-  addBeacon('table', '#00d8ff', 0, 13, 0);
-  addBeacon('mast', '#7af0ff', 11, 12, -3);
-  addBeacon('towers', '#8a5cff', 17, 30, -18);
+  addBeacon('table', '#5b9bff', 0, 12, 0);
+  addBeacon('mast', '#57e8ff', mastPos.x, 15, mastPos.z);
+  addBeacon('towers', '#2ad4ff', camPos.x, 10, camPos.z);   // traversability corridor + cams
 
-  // ===== portal back to the map =====
-  const portal = makePortal('#00d8ff');
-  portal.group.position.set(15, 0, 13); g.add(portal.group);
+  // ===== portal in the pad's cleared corner =====================================
+  const portal = makePortal('#3b82f6');
+  portal.group.position.set(portalPos.x, 0, portalPos.z); g.add(portal.group);
 
-  const label = makeLabel('Splasher', 'BEV Labeling', '#00b8d9');
+  const label = makeLabel('Splasher', 'BEV Labeling', '#3b82f6');
   label.sprite.position.set(0, 40, 0); g.add(label.sprite);
 
   tagPickable(g, 'splasher');
 
+  const _base = new THREE.Color(), _tint = new THREE.Color(BLUE_HI);
   return {
     group: g, label,
-    // dive-in framing: centre on the holographic BEV table with the dark-aqua neon
-    // skyline around it (fixed, so it's the same hero shot on every seed).
-    frame: { target: [0, 7, 0], azimuth: 0.5, polar: 57, radius: 64 },
+    frame: { target: [0, 7, 0], azimuth: 0.5, polar: 55, radius: 62 },
     pois: pois.map((p) => ({ id: p.id, accent: p.accent, anchor: p.beacon.anchor, setState: p.beacon.setState })),
-    update(t, dt) {
+    update(t) {
       portal.update(t);
       for (const p of pois) p.beacon.update(t);
-      sweepPivot.rotation.y = -t * 1.1;
-      scanner.rotation.y = t * 1.2;
-      for (const c of cars) c.material.opacity = 0.7 + Math.sin(t * 2.2 + c.position.x) * 0.25;
-      for (const e of towerStrips) e.material.emissiveIntensity = 1.3 + Math.sin(t * 2 + e.position.z) * 0.6;
-      for (let i = 0; i < feeds.length; i++) {
-        feeds[i].material.emissiveIntensity = 0.9 + Math.abs(Math.sin(t * (3 + i) + i)) * 0.8; // scanline flicker
-      }
+
+      // splash rings expand from the ego dot; cells inside a ring's annulus flip
+      // toward class-blue, then decay back to their stored viridis behind it
+      let needsColor = false;
+      const radii = [];
       for (const o of rings) {
-        const f = (t * 0.35 + o.ph) % 1; const s = 0.6 + f * 7;
-        o.ring.scale.set(s, s, 1); o.ring.material.opacity = Math.max(0, 1 - f);
+        const f = (t * 0.2 + o.ph) % 1;
+        const R = 1 + f * (RMAX + 2);
+        o.ring.scale.set(R, R, 1);
+        o.ring.material.opacity = Math.max(0, 0.9 - f);
+        radii.push(R);
+      }
+      for (let ci = 0; ci < cells.length; ci++) {
+        const c = cells[ci];
+        let hit = 0;
+        for (const R of radii) {
+          const d = Math.abs(c.r - R);
+          if (d < 1.6) hit = Math.max(hit, 1 - d / 1.6);
+        }
+        _base.setRGB(baseCols[ci * 3], baseCols[ci * 3 + 1], baseCols[ci * 3 + 2]);
+        if (hit > 0.02) { _base.lerp(_tint, hit * 0.85); needsColor = true; }
+        bodies.setColorAt(ci, _base);
+      }
+      if (needsColor && bodies.instanceColor) bodies.instanceColor.needsUpdate = true;
+
+      // ego drift: dashed lanes scroll down the corridor (obstacles stream past)
+      for (const ln of lanes) {
+        ln.position.x -= 0.06;
+        if (ln.position.x < 3) ln.position.x += 9 * 2.4;
+      }
+      scanPivot.rotation.y = t * 0.5;          // the lidar scan line re-reducing points
+      scanner.rotation.y = t * 1.2;
+      cage.rotation.y = t * 0.4;
+      swarm.rotation.y = -t * 0.5;
+      dot.material.emissiveIntensity = 1.8 + Math.sin(t * (Math.PI * 2) * 0.2 * 2) * 0.9;
+      for (let i = 0; i < feeds.length; i++) {
+        feeds[i].material.emissiveIntensity = 0.9 + Math.abs(Math.sin(t * (3 + i) + i)) * 0.8;
       }
     },
   };
+}
+
+// dark blue SQUARE canvas slab — the BEV viewport's margin (the app view is a
+// rectangle, so the city ground is one too), lifted enough to sit with the terrain
+function platformDark(side) {
+  const geo = new THREE.BoxGeometry(side, 1.4, side);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x212a36, flatShading: true, roughness: 0.9 });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.y = -0.56;
+  m.receiveShadow = true;
+  return m;
 }

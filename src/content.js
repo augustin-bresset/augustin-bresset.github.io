@@ -106,26 +106,26 @@ export const POIS = {
   toaster: {
     stage: (l) => l === 'fr' ? {
       kicker: 'LiDAR 3D · Annotation', title: 'Toaster',
-      body: "Outil d'annotation de nuages de points 3D : étiquetez un cluster entier en un seul clic, sans boîtes image par image.",
+      body: "Étiqueter des nuages de points 3D le plus vite possible : vous sélectionnez, le segmenter fait le reste — un objet entier labellisé en un clic.",
     } : {
       kicker: '3D LiDAR · Annotation', title: 'Toaster',
-      body: 'A 3D point-cloud annotation tool: label a whole cluster in a single click, no frame-by-frame boxing.',
+      body: 'Label 3D point clouds as fast as possible: you select, the segmenter does the rest — a whole object labelled in one click.',
     },
     landmark: (l) => l === 'fr' ? {
-      kicker: 'Interfaces', title: 'Trois Skins',
-      body: "Un même moteur, trois ambiances : Toaster (néon rouge brutaliste), Café Toaster (espresso chaud) et Arcade Quest (CRT rétro).",
+      kicker: 'Sélection', title: 'Point · Boîte · Voxel',
+      body: "Trois façons de saisir les points : un par un, à la boîte englobante, ou par grille de voxels — selon la scène et la précision voulue.",
     } : {
-      kicker: 'Interfaces', title: 'Three Skins',
-      body: 'One engine, three moods: Toaster (brutalist neon-red), Café Toaster (warm espresso) and Arcade Quest (retro CRT).',
+      kicker: 'Selection', title: 'Point · Box · Voxel',
+      body: 'Three ways to grab points: one by one, by bounding box, or on a voxel grid — whichever fits the scene and the precision you need.',
     },
     clustering: (l) => l === 'fr' ? {
-      kicker: 'Sous le capot', title: 'Clusters en un clic',
-      body: "DBSCAN, HDBSCAN et K-means proposent les clusters ; vous confirmez ou fusionnez.",
+      kicker: 'Sous le capot', title: 'Segmenters à la carte',
+      body: "Branchez vos propres algorithmes : clustering (K-means, DBSCAN, HDBSCAN), détection de sol (CSF)… jusqu'à des modèles de segmentation, sémantique ou non.",
       meta: [['Stack', 'Python · Three.js · FastAPI · pywebview']],
       links: [['Démo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     } : {
-      kicker: 'Under the hood', title: 'One-Click Clusters',
-      body: 'DBSCAN, HDBSCAN and K-means propose the clusters; you confirm or merge.',
+      kicker: 'Under the hood', title: 'Pluggable Segmenters',
+      body: 'Plug in your own algorithms: clustering (K-means, DBSCAN, HDBSCAN), ground detection (CSF)… up to full segmentation models, semantic or not.',
       meta: [['Stack', 'Python · Three.js · FastAPI · pywebview']],
       links: [['Demo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     },
@@ -148,12 +148,12 @@ export const POIS = {
     },
     towers: (l) => l === 'fr' ? {
       kicker: 'Conçu pour', title: 'Traversabilité',
-      body: "Interface brutaliste sombre-aqua pensée pour la précision de traversabilité des systèmes autonomes.",
+      body: "La tâche phare : marquer cellule par cellule ce qui est franchissable sur la grille vue-du-ciel — la précision dont un robot autonome a besoin pour rouler.",
       meta: [['Stack', 'Python · Three.js · FastAPI']],
       links: [['Démo ↗', 'https://huggingface.co/spaces/SmaugC137/splasher'], ['GitHub ↗', 'https://github.com/augustin-bresset/splasher']],
     } : {
       kicker: 'Built for', title: 'Traversability',
-      body: 'A dark-aqua brutalist UI tuned for traversability precision in autonomous systems.',
+      body: "The flagship task: mark cell by cell what's drivable on the bird's-eye grid — the precision an autonomous robot needs to move.",
       meta: [['Stack', 'Python · Three.js · FastAPI']],
       links: [['Demo ↗', 'https://huggingface.co/spaces/SmaugC137/splasher'], ['GitHub ↗', 'https://github.com/augustin-bresset/splasher']],
     },

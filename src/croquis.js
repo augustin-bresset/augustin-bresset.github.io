@@ -166,6 +166,21 @@ export function buildCroquis(stage, container, seed) {
   ships.push({ group: b612.group, base: new THREE.Vector3(), prop: null,
     drift: new THREE.Vector3(2, 0, 2), bob: 1.3, spin: 0.05, heading: 0, rare: true });
 
+  // themed MONTGOLFIÈRES — one per project, drifting by from time to time. Each
+  // balloon wears its project's identity in pale pastel: the toast balloon (warm red
+  // band, a toast slab swinging under the basket), the splash droplet (cyan, teardrop
+  // envelope), the inventor's patchwork (warm amber, a wooden gear hanging).
+  const BALLOON_THEMES = ['toast', 'splash', 'gear'];
+  BALLOON_THEMES.forEach((theme, i) => {
+    const brng = mulberry32((seed ^ (0xba1100 * (i + 1))) >>> 0);
+    const b = makeMontgolfiere(brng, theme);
+    group.add(b.group);
+    ships.push({ group: b.group, base: new THREE.Vector3(), prop: null,
+      drift: new THREE.Vector3((brng() * 2 - 1) * 6, 2 + brng() * 2, (brng() * 2 - 1) * 6),
+      bob: brng() * Math.PI * 2, spin: (brng() - 0.5) * 0.06, heading: brng() * Math.PI * 2,
+      rare: true });   // rare spawn band: high and precious, like the B-612
+  });
+
   // ================= construction horizon guide (non-photo-blue) =================
   const horizon = new THREE.Sprite(new THREE.SpriteMaterial({
     map: bakeHorizonTex(), transparent: true, depthWrite: false, opacity: 0.34, fog: false }));
@@ -455,6 +470,63 @@ function makeSkiff(rng) {
   g.scale.setScalar(0.7 + rng() * 0.6);
   return { group: g };
 }
+// a hot-air balloon in the pencil style, themed per project. Envelope + basket get
+// the inverted-hull graphite contour like everything else; the theme shows in the
+// pale pastel envelope tint, its shape, and a small charm hanging under the basket.
+function makeMontgolfiere(rng, theme = 'toast') {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ color: WOOD1, flatShading: true });
+  // pale pastel tints — "beaucoup de couleur mais pâle", never saturated
+  const TINTS = {
+    toast:  { env: 0xe8c8bc, band: 0xd98f82, charm: 0xcaa15a },  // warm red, toast slab
+    splash: { env: 0xc6dee8, band: 0x8fbcd4, charm: 0xa8d4e4 },  // cyan, droplet
+    gear:   { env: 0xe9dcc2, band: 0xd4b78a, charm: 0xb8966a },  // amber, wooden gear
+  };
+  const tint = TINTS[theme] || TINTS.toast;
+  const cloth = new THREE.MeshLambertMaterial({ color: tint.env, flatShading: true });
+
+  // envelope: sphere for toast/gear, a stretched teardrop for the splash droplet
+  const env = new THREE.SphereGeometry(1, 14, 10);
+  if (theme === 'splash') { env.scale(13, 17, 13); env.translate(0, 2, 0); }
+  else env.scale(15, 16, 15);
+  outlined(env, cloth, 0.5, (rng() * 1e9) | 0, g);
+  // pastel band around the equator
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(
+    theme === 'splash' ? 12.6 : 14.6, theme === 'splash' ? 12.6 : 14.6, 4.5, 14, 1, true),
+    new THREE.MeshBasicMaterial({ color: tint.band, side: THREE.DoubleSide }));
+  band.position.y = theme === 'splash' ? 2 : 0;
+  g.add(band);
+
+  // basket + rigging
+  const basket = new THREE.BoxGeometry(6, 4.5, 6);
+  outlined(basket, wood, 0.4, (rng() * 1e9) | 0, g).position.y = -22;
+  const rig = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-2.6, -19.8, -2.6), new THREE.Vector3(-7, -8, -7),
+    new THREE.Vector3(2.6, -19.8, -2.6), new THREE.Vector3(7, -8, -7),
+    new THREE.Vector3(-2.6, -19.8, 2.6), new THREE.Vector3(-7, -8, 7),
+    new THREE.Vector3(2.6, -19.8, 2.6), new THREE.Vector3(7, -8, 7),
+  ]), new THREE.LineBasicMaterial({ color: ROPE }));
+  g.add(rig);
+
+  // the project charm swinging under the basket
+  if (theme === 'toast') {
+    const slab = new THREE.BoxGeometry(4.2, 4.8, 1.1);
+    outlined(slab, new THREE.MeshLambertMaterial({ color: tint.charm, flatShading: true }),
+      0.35, (rng() * 1e9) | 0, g).position.y = -28;
+  } else if (theme === 'splash') {
+    const drop = new THREE.SphereGeometry(2.2, 8, 6); drop.scale(1, 1.5, 1);
+    outlined(drop, new THREE.MeshLambertMaterial({ color: tint.charm, flatShading: true }),
+      0.35, (rng() * 1e9) | 0, g).position.y = -28;
+  } else {
+    const gear = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.9, 6, 8),
+      new THREE.MeshLambertMaterial({ color: tint.charm, flatShading: true }));
+    gear.position.y = -28; g.add(gear);
+  }
+
+  g.scale.setScalar(0.9 + rng() * 0.5);
+  return { group: g };
+}
+
 // the B-612 — a tiny asteroid-world, kept precious
 function makeAsteroid(rng) {
   const g = new THREE.Group();
