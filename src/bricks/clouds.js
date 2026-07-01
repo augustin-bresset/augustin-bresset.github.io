@@ -40,13 +40,14 @@ export function buildClouds(seed, worldHalf) {
 
   // ===== soft horizon band =====
   // A ring of big, soft sprite puffs far out where the land dissolves into the fog,
-  // giving the horizon a hazy cloud line. Fog-aware so they melt into the sky rather
-  // than reading as a hard wall.
+  // giving the horizon a hazy cloud line. Kept WELL beyond the island (not tied to its
+  // small radius) and softer, so turning the camera to a coast that faces no mountains
+  // doesn't wash the whole island white. Fog-aware so they melt into the sky.
   const mistTex = makeMistTexture();
   const bank = new THREE.Group();
   const RINGS = [
-    { r: worldHalf * 0.80, n: 150, y: 240, sMin: 360, sMax: 520, yj: 110 },
-    { r: worldHalf * 0.96, n: 120, y: 360, sMin: 420, sMax: 600, yj: 150 },
+    { r: Math.max(1050, worldHalf * 1.25), n: 120, y: 250, sMin: 360, sMax: 520, yj: 120 },
+    { r: Math.max(1320, worldHalf * 1.60), n: 90, y: 380, sMin: 420, sMax: 600, yj: 160 },
   ];
   const banks = [];
   for (const ring of RINGS) {
@@ -55,7 +56,7 @@ export function buildClouds(seed, worldHalf) {
       const rr = ring.r * (0.92 + rand() * 0.16);
       const sm = new THREE.SpriteMaterial({
         map: mistTex, transparent: true, depthWrite: false,
-        opacity: 0.5 + rand() * 0.34, color: 0xfffdf6, fog: true,
+        opacity: 0.3 + rand() * 0.22, color: 0xfffdf6, fog: true,
       });
       const sp = new THREE.Sprite(sm);
       const w = ring.sMin + rand() * (ring.sMax - ring.sMin);
