@@ -141,8 +141,7 @@ export class Navigation {
     }
   }
 
-  // re-pin the open note (camera is frozen in-city, but this keeps it correct
-  // across the settle frames + window resizes). Called from the render loop.
+  // re-pin the open note each frame (camera can orbit in-city). Called from the render loop.
   tick() {
     if (this.state !== 'city' || !this.openPoiId) return;
     const poi = this._poiById[this.openPoiId];
@@ -180,6 +179,7 @@ export class Navigation {
     this._poiById = Object.fromEntries((city.pois || []).map((p) => [p.id, p]));
     this._hoverPoi = null;
     this.openPoiId = null;
+    this.rig.enabled = true;          // re-enable input after dive animation
     this.rig.orbitOnly = true;        // drag = orbit the settlement (see every façade)
     this._applyPoiStates();
     this.ui.setBack(true);

@@ -22,13 +22,30 @@ const DEEP = new THREE.Color('#2c261f');
 const DIRT = new THREE.Color('#5c4a32');
 const MOSS = new THREE.Color('#65763f');
 
+// Four distinct underside profiles — same keel depth, very different silhouettes.
+// 0: smooth taper (default, current behaviour)
+// 1: mushroom — wide top, pinched waist, small flare before keel
+// 2: spire — aggressive straight-down taper for a sharp stalactite look
+// 3: overhang — outward bulge at ~40% depth then rapid taper; dramatic undercut
+function _profileR(u, style) {
+  if (style === 1) {
+    const pinch = Math.max(0, 1 - 5 * Math.abs(u - 0.38));
+    return Math.max(0.04, (1 - u) * (1 - 0.52 * pinch) * (1 + 0.18 * Math.sin(u * Math.PI * 1.1)));
+  } else if (style === 2) {
+    return Math.max(0.04, Math.pow(1 - u, 2.0) * (1 + 0.14 * Math.sin(u * Math.PI)));
+  } else if (style === 3) {
+    return Math.max(0.04, (1 - u) * (1 + 0.72 * Math.sin(u * Math.PI * 1.35)));
+  }
+  return Math.max(0.05, (1 - u) * (1 + 0.28 * Math.sin(u * Math.PI)));
+}
+
 // Build one island's rocky underside: rings from the coast rim (following the real
 // terrain-edge height) tapering down to a keel, jagged with cheap hashed noise.
-function makeSkirt(field, cx, cz, rim, depth, seed) {
+function makeSkirt(field, cx, cz, rim, depth, seed, profStyle = 0) {
   const SEG = rim.length;
   const RINGS = 15;
   const rand = seed;
-  const profileR = (u) => Math.max(0.05, (1 - u) * (1 + 0.28 * Math.sin(u * Math.PI)));
+  const profileR = (u) => _profileR(u, profStyle);
   const easeU = (u) => Math.pow(u, 1.3);
 
   // top ring follows the real terrain height at the island edge, so the skirt meets
@@ -105,11 +122,14 @@ export function buildFlying(field, half, seed, opts = {}) {
     : null;
 
   if (islands) {
-    // archipelago: one skirt per carved island, hugging its own edge
+    // archipelago: one skirt per carved island, hugging its own edge.
+    // Each island gets a seed-derived profile style for visual variety.
     let s = 0;
     for (const isl of islands) {
       const depth = 150 + (isl.R || 160) * 0.75;
-      const geo = makeSkirt(field, isl.x, isl.z, isl.rim, depth, (seed ^ (0x51 * (s + 1))) >>> 0);
+      const skirtSeed = (seed ^ (0x51 * (s + 1))) >>> 0;
+      const profStyle = ((seed ^ (0xf7 * (s + 3))) >>> 0) % 4;
+      const geo = makeSkirt(field, isl.x, isl.z, isl.rim, depth, skirtSeed, profStyle);
       const m = new THREE.Mesh(geo, rockMat);
       m.name = 'flying-underside';
       group.add(m);
