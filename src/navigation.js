@@ -109,11 +109,13 @@ export class Navigation {
       if (cityId) this.diveTo(cityId);
     } else if (this.state === 'city') {
       const { poi, portal, portalPoint, portalNormal } = this._pick(e);
-      if (poi) {
+      // the portal WINS over a POI: a wall portal lives on a POI-tagged building
+      // (the atelier), and diving through it is the more specific intent.
+      if (portal) {
+        this.portalBack(portalPoint, portalNormal); // Klein-bottle dive through portal
+      } else if (poi) {
         if (poi === this.openPoiId) this.closeNote();
         else this.openNote(this._poiById[poi]);
-      } else if (portal) {
-        this.portalBack(portalPoint, portalNormal); // Klein-bottle dive through portal
       } else if (this.openPoiId) {
         this.closeNote();                        // click empty space dismisses
       }
@@ -192,6 +194,21 @@ export class Navigation {
   _enterCity(city) {
     this.state = 'city';
     this.activeCity = city;
+    // If this city's portal is a WALL (vertical, on a façade), switch the shared
+    // portal camera to the full A→B transform so the window shows the world from
+    // above instead of the horizon. Horizontal discs keep the plain lift.
+    city.group.updateMatrixWorld(true);
+    let wall = null;
+    city.group.traverse((o) => {
+      if (wall || !o.userData.portalNormal) return;
+      const n = o.userData.portalNormal.clone().transformDirection(o.matrixWorld);
+      if (n.y < 0.7) {
+        const c = (o.userData.portalCenter || new THREE.Vector3()).clone().applyMatrix4(o.matrixWorld);
+        wall = { c, n };
+      }
+    });
+    if (wall) portalRender.setWallPortal(wall.c, wall.n);
+    else portalRender.clearWallPortal();
     this._poiById = Object.fromEntries((city.pois || []).map((p) => [p.id, p]));
     this._hoverPoi = null;
     this.openPoiId = null;
@@ -238,6 +255,7 @@ export class Navigation {
     this.closeNote();
     this.rig.orbitOnly = false;       // back to map-panning
     this.ui.setBack(false);
+    portalRender.clearWallPortal();   // overview discs go back to the plain lift view
     this.activeCity = null;
     this._poiById = {};
     this._hoverPoi = null;
@@ -315,25 +333,27 @@ export class Navigation {
     }, 1.0);
   }
 
-  // Phase 3 — the seamless swap. Reproduce the virtual camera pose (player lifted ΔY)
-  // EXACTLY in rig parameters, so apply() places the real camera where the window was
-  // already showing. Then ease gently to the overview (continuous, no cut).
+  // Phase 3 — the seamless swap. Reproduce the virtual camera pose EXACTLY in rig
+  // parameters, so apply() places the real camera where the window was already
+  // showing. The pose is pushed through the active portal transform (a plain lift
+  // for horizontal discs, the full 90° A→B turn for wall portals), then we ease
+  // gently to the overview (continuous, no cut).
   _portalSwap() {
-    const liftY = portalRender.liftY;
-
     // Player's exact pose at the end of the dive.
     const camPos = this.rig.camera.position.clone();
     const dir = new THREE.Vector3();
     this.rig.camera.getWorldDirection(dir);   // unit view direction (points into screen)
 
-    // Virtual camera = same orientation, position lifted ΔY.
-    const C = camPos.clone(); C.y += liftY;
+    const C = camPos.clone();
+    portalRender.mapPose(C, dir);             // through the portal → the exit pose
+    portalRender.clearWallPortal();           // back on the overview side: discs lift
 
     // Solve rig params (target, azimuth, polar, radius) that reproduce (position C,
     // view direction dir) exactly — see CameraRig.apply():
     //   position = target − radius·dir ,  looking along dir.
     // radius is chosen so the target lands on the ground plane (y = 0) ahead of us.
-    const pol = Math.acos(THREE.MathUtils.clamp(-dir.y, -1, 1));
+    // (floor keeps lookAt non-degenerate if the mapped gaze is exactly vertical)
+    const pol = Math.max(0.04, Math.acos(THREE.MathUtils.clamp(-dir.y, -1, 1)));
     const az  = Math.atan2(-dir.x, -dir.z);
     const radius = (dir.y < -1e-3) ? (-C.y / dir.y) : 1200;   // ground hit, or far ahead
     const target = C.clone().add(dir.clone().multiplyScalar(radius));

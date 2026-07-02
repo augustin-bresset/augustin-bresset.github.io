@@ -9,22 +9,23 @@
 // peaks (the flagship labeling task made a street). Zero random position, zero
 // random yaw: one coherent heightfield, one lattice.
 import * as THREE from 'three';
-import { box, cyl, glow, wireBox, pointCloud, makeLabel, makePortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
+import { box, cyl, glow, wireBox, pointCloud, makeLabel, makeWallPortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
 import { Simplex, clamp, smoothstep } from '../gen/noise.js';
 
 const N = 32, PITCH = 1.5, RMAX = 24;
 const BLUE = 0x3b82f6, BLUE_HI = 0x5b9bff, CYAN = 0x2ad4ff;
 
-// viridis ramp, floor lifted toward indigo so short cells never read black
-const VIRIDIS = [
-  new THREE.Color(0x440154).lerp(new THREE.Color(0x3b528b), 0.15),
-  new THREE.Color(0x3b528b), new THREE.Color(0x21918c),
-  new THREE.Color(0x5ec962), new THREE.Color(0xfde725),
+// height ramp in SHADES OF BLUE ONLY (the tool's dark-aqua identity): deep navy
+// lowlands → blue → pale cyan crests. One hue family, value = height — reads as a
+// bathymetric relief instead of a disco ball.
+const RAMP = [
+  new THREE.Color(0x22305e), new THREE.Color(0x2b4a8f), new THREE.Color(0x3b6fc4),
+  new THREE.Color(0x57a8d9), new THREE.Color(0xa8e0f0),
 ];
 function viridis(out, t) {
-  const f = clamp(t, 0, 1) * (VIRIDIS.length - 1);
-  const i = Math.min(VIRIDIS.length - 2, Math.floor(f));
-  return out.copy(VIRIDIS[i]).lerp(VIRIDIS[i + 1], f - i);
+  const f = clamp(t, 0, 1) * (RAMP.length - 1);
+  const i = Math.min(RAMP.length - 2, Math.floor(f));
+  return out.copy(RAMP[i]).lerp(RAMP[i + 1], f - i);
 }
 
 // flat glowing grid-line overlay (the BEV raster)
@@ -43,12 +44,10 @@ export function build() {
   const g = new THREE.Group();
   const sim = new Simplex(33);
 
-  // SQUARE canvas pad — the BEV viewport is a rectangle, so its pad is one too,
-  // barely larger than the grid: the city fills its ground, no black apron.
-  g.add(platformDark(50));
+  // no platform: the terrain is tinted deep-navy under the city (terrain.js
+  // fusion zone) and lightly flattened — the BEV lattice grows from the land.
 
   const mastPos = { x: -16, z: 14 }, camPos = { x: 18, z: 6 };
-  const portalPos = { x: 20, z: 20 };            // pad corner, cells cleared around it
 
   // ===== the BEV heightfield: one instanced lattice of viridis columns ==========
   const cells = [];
@@ -60,20 +59,22 @@ export function build() {
       if (r < 3) continue;                                    // ego plaza at centre
       if (Math.hypot(x - mastPos.x, z - mastPos.z) < 3) continue;   // sensor footprints
       if (Math.hypot(x - camPos.x, z - camPos.z) < 3.2) continue;
-      if (Math.hypot(x - portalPos.x, z - portalPos.z) < 5) continue;  // portal clearing
       const corridor = x > 2 && Math.abs(z) < 1.7;            // drivable channel (+x)
+      const rc = Math.max(Math.abs(x), Math.abs(z));          // Chebyshev: SQUARE metric
       if (!corridor) {
         if (Math.abs(x) < 0.8 || Math.abs(z) < 0.8) continue;       // N/E/S/W spoke streets
-        if (Math.abs(r - 10) < 0.8 || Math.abs(r - 18) < 0.8) continue; // ring avenues
+        if (Math.abs(rc - 10) < 0.8 || Math.abs(rc - 18) < 0.8) continue; // SQUARE avenues
       }
-      // one coherent field: radial envelope × (fbm ground + ridged obstacle peaks)
-      const env = 1 - smoothstep(0.12, 1.0, r / RMAX);
-      const detail = 0.5 + 0.5 * sim.fbm(x * 0.09, z * 0.09, { octaves: 4 });
-      const ridge = sim.ridged(x * 0.05, z * 0.05, { octaves: 3 });
-      if (r > RMAX * 0.97 && detail < 0.3) continue;          // barely-thinned rim (fill the disc)
-      let hN = clamp(env * (0.35 + 0.55 * detail + 0.5 * ridge), 0, 1);
+      // one coherent field, deliberately NOT round: a SQUARE envelope (the BEV frame
+      // is a rectangle, not a dome) + anisotropic noise so the skyline forms straight
+      // block-ridges instead of a circular mound.
+      const env = 1 - smoothstep(0.12, 1.0, rc / RMAX);
+      const detail = 0.5 + 0.5 * sim.fbm(x * 0.055, z * 0.12, { octaves: 4 });
+      const ridge = sim.ridged(x * 0.045, z * 0.1, { octaves: 3 });
+      if (rc > RMAX * 0.97 && detail < 0.3) continue;         // barely-thinned rim (fill the pad)
+      let hN = clamp(env * (0.28 + 0.48 * detail + 0.62 * ridge), 0, 1);
       hN = Math.round(hN * 6) / 6;                            // 6 terrace steps
-      let h = 0.6 + hN * 17;
+      let h = 0.6 + hN * 22;
       if (corridor) { h = 0.5; hN = -1; }                     // flat, class-blue
       cells.push({ x, z, h, hN, r, corridor });
     }
@@ -95,7 +96,7 @@ export function build() {
     bodies.setMatrixAt(ci, _m);
     _m.compose(_v.set(c.x, c.h + 0.08, c.z), _q, _s.set(1, 1, 1));
     caps.setMatrixAt(ci, _m);
-    if (c.corridor) _col.set(BLUE);
+    if (c.corridor) _col.set(0x8fd8f4);   // the drivable channel glows pale against the deep blues
     else viridis(_col, c.hN);
     bodies.setColorAt(ci, _col);
     baseCols[ci * 3] = _col.r; baseCols[ci * 3 + 1] = _col.g; baseCols[ci * 3 + 2] = _col.b;
@@ -182,8 +183,22 @@ export function build() {
   addBeacon('towers', '#2ad4ff', camPos.x, 10, camPos.z);   // traversability corridor + cams
 
   // ===== portal in the pad's cleared corner =====================================
-  const portal = makePortal('#3b82f6');
-  portal.group.position.set(portalPos.x, 0, portalPos.z); g.add(portal.group);
+  // ===== THE END OF THE ROAD — the portal stands at the corridor's terminus: the
+  // one drivable channel across the BEV leads straight through the gate and out of
+  // the world. Two checkpoint pylons + gantry frame it like a finish line.
+  const gate = new THREE.Group();
+  gate.position.set(24.6, 0, 0);
+  gate.rotation.y = -Math.PI / 2;               // the doorway faces back down the corridor
+  for (const dz of [-3.6, 3.6]) {
+    gate.add(box(1.1, 7, 1.1, 0x151a22, { pos: [dz, 3.5, -0.9], roughness: 0.6, metalness: 0.2, emissive: 0x151a22, emissiveIntensity: 0.2 }));
+    gate.add(box(0.5, 0.5, 0.5, CYAN, { pos: [dz, 7.3, -0.9], emissive: CYAN, emissiveIntensity: 1.6, cast: false }));
+  }
+  gate.add(box(8.4, 0.9, 1.1, 0x151a22, { pos: [0, 7, -0.9], roughness: 0.6, emissive: 0x151a22, emissiveIntensity: 0.2 }));
+  gate.add(box(7.4, 0.22, 0.3, BLUE, { pos: [0, 6.4, -0.35], emissive: BLUE, emissiveIntensity: 1.2, cast: false }));
+  const portal = makeWallPortal('#3b82f6');
+  portal.group.position.set(0, 0, -0.2);
+  gate.add(portal.group);
+  g.add(gate);
 
   const label = makeLabel('Splasher', 'BEV Labeling', '#3b82f6');
   label.sprite.position.set(0, 40, 0); g.add(label.sprite);
@@ -240,13 +255,3 @@ export function build() {
   };
 }
 
-// dark blue SQUARE canvas slab — the BEV viewport's margin (the app view is a
-// rectangle, so the city ground is one too), lifted enough to sit with the terrain
-function platformDark(side) {
-  const geo = new THREE.BoxGeometry(side, 1.4, side);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x212a36, flatShading: true, roughness: 0.9 });
-  const m = new THREE.Mesh(geo, mat);
-  m.position.y = -0.56;
-  m.receiveShadow = true;
-  return m;
-}

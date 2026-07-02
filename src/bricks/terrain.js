@@ -17,9 +17,14 @@ function hash2(i, j) {
 // nothing, carving the continent into separate floating islands with sky between them.
 // (flatShading computes normals in-shader from position derivatives, so degenerate
 // faces are safe — the vertex-normal buffer is unused.)
+// opts.zones — optional [{x, z, r, color}]: city-ground fusion rings. Terrain faces
+// near a city are tinted toward that city's own ground colour (full inside the pad,
+// feathering out to ~1.7r), so the settlement grows out of the landscape instead of
+// sitting on a dropped plate.
 export function buildTerrainMesh(field, opts = {}) {
   const { N, heights, biome, idx, gx, gz } = field;
   const cellVisible = opts.cellVisible || (() => true);
+  const zones = (opts.zones || []).map((z) => ({ ...z, c: new THREE.Color(z.color) }));
   const triCount = N * N * 2;
   const positions = new Float32Array(triCount * 3 * 3);
   const colors = new Float32Array(triCount * 3 * 3);
@@ -52,6 +57,17 @@ export function buildTerrainMesh(field, opts = {}) {
           const my = (ay + by + cy) / 3;
           const jit = (hash2(i * 2 + ti, j) - 0.5) * 0.05;
           faceColor(col, b00, my, slope, jit);
+          // city-ground fusion: the terrain IS the city floor now (no platform
+          // mesh) — near-uniform city colour inside the pad radius, feathering
+          // back to the biome beyond it
+          for (const zn of zones) {
+            const mx = (ax + bx + cx) / 3, mz = (az + bz + cz) / 3;
+            const d = Math.hypot(mx - zn.x, mz - zn.z);
+            if (d > zn.r * 1.45) continue;
+            const tt = d < zn.r ? 0.94
+              : 0.94 * (1 - clamp((d - zn.r) / (zn.r * 0.45), 0, 1));
+            col.lerp(zn.c, tt);
+          }
           for (let v = 0; v < 3; v++) {
             colors[o + v * 3] = col.r;
             colors[o + v * 3 + 1] = col.g;

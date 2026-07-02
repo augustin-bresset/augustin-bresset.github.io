@@ -12,7 +12,8 @@
 import { smoothstep } from './noise.js';
 
 const SEA = 1.0;               // waterline: below this is sea (matches the coast)
-const SEGR = 72;               // rim angular resolution per island
+const SEGR = 120;              // rim angular resolution per island (fine enough that
+                               // the skirt collar tracks the jagged per-cell terrain edge)
 
 export function buildIslandField(field, anchors, seed) {
   const { N, verts, heights, size, half, gx, gz, idx } = field;
@@ -113,7 +114,7 @@ export function buildIslandField(field, anchors, seed) {
       const th = (s / SEGR) * Math.PI * 2;
       const cx = Math.cos(th), cz = Math.sin(th);
       let r = 44;
-      for (let rr = 44; rr <= a.R * 1.4; rr += 6) {
+      for (let rr = 44; rr <= a.R * 1.4; rr += 3) {
         const x = a.x + cx * rr, z = a.z + cz * rr;
         let owns = true;
         for (let bi = 0; bi < A.length; bi++) {
@@ -121,7 +122,7 @@ export function buildIslandField(field, anchors, seed) {
           if (Math.hypot(x - A[bi].x, z - A[bi].z) < rr - 1) { owns = false; break; }
         }
         if (!owns || !atWorld(x, z)) break;      // stop at the first void / border
-        r = rr + 6;
+        r = rr + 3;
       }
       rim[s] = r;
     }

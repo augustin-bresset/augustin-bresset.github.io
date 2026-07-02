@@ -28,7 +28,12 @@ export const EXIT_H1     = 900;    // sky height of the Klein-bottle exit portal
 let _renderer = null, _scene = null, _rt = null, _camera = null;
 const _discs = [];                        // portal disc meshes to hide during RT render
 const _res   = new THREE.Vector2(1, 1);   // drawing-buffer size (shared with disc shader)
-const _lift  = new THREE.Matrix4();        // world-space +ΔY translation
+const _lift  = new THREE.Matrix4();        // world-space +ΔY translation (horizontal discs)
+// WALL portals (vertical, on a façade) need the FULL portal transform M = T_B·inv(T_A):
+// looking INTO the wall becomes looking DOWN from the sky exit — a 90° turn, not a
+// lift. Set by navigation when the active city's portal is a wall; cleared otherwise.
+const _wallM = new THREE.Matrix4();
+let _hasWall = false;
 
 export const portalRender = {
   init(renderer, scene) {
@@ -56,11 +61,37 @@ export const portalRender = {
   // sampling the RT while we render INTO the RT would be a feedback loop).
   registerDisc(mesh) { if (mesh && !_discs.includes(mesh)) _discs.push(mesh); },
 
-  // Compose the virtual camera from the player camera: same orientation & projection,
-  // position lifted by ΔY in world space.
+  // Declare the active portal as a WALL at `center` with outward `normal` (world
+  // space). Builds M = T_B · inv(T_A): frame A sits on the wall (z = normal), frame
+  // B is the horizontal sky exit above it (z = up) — so a gaze INTO the wall maps to
+  // a gaze DOWN at the world from EXIT_H1. Cleared → back to the plain disc lift.
+  setWallPortal(center, normal) {
+    const zA = normal.clone().normalize();
+    const xA = new THREE.Vector3(0, 1, 0).cross(zA).normalize();
+    const yA = zA.clone().cross(xA).normalize();
+    const zB = new THREE.Vector3(0, 1, 0);
+    const xB = xA.clone();
+    const yB = zB.clone().cross(xB).normalize();
+    const A = new THREE.Matrix4().makeBasis(xA, yA, zA).setPosition(center.x, center.y, center.z);
+    const B = new THREE.Matrix4().makeBasis(xB, yB, zB).setPosition(center.x, EXIT_H1, center.z);
+    _wallM.copy(B).multiply(A.invert());
+    _hasWall = true;
+  },
+  clearWallPortal() { _hasWall = false; },
+
+  // Map a world pose (position + unit direction) through the active portal transform
+  // — used by navigation for the seamless camera swap at the end of the dive.
+  mapPose(pos, dir) {
+    const M = _hasWall ? _wallM : _lift;
+    pos.applyMatrix4(M);
+    dir.transformDirection(M);
+  },
+
+  // Compose the virtual camera from the player camera: same projection, pose pushed
+  // through the active portal transform (plain lift for discs, T_B·inv(T_A) for walls).
   update(playerCamera) {
     if (!_camera || !playerCamera) return;
-    _camera.matrixWorld.multiplyMatrices(_lift, playerCamera.matrixWorld);
+    _camera.matrixWorld.multiplyMatrices(_hasWall ? _wallM : _lift, playerCamera.matrixWorld);
     _camera.matrixWorldInverse.copy(_camera.matrixWorld).invert();
     _camera.projectionMatrix.copy(playerCamera.projectionMatrix);
     _camera.projectionMatrixInverse.copy(playerCamera.projectionMatrixInverse);

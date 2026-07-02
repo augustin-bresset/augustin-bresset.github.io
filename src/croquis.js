@@ -170,15 +170,22 @@ export function buildCroquis(stage, container, seed) {
   // balloon wears its project's identity in pale pastel: the toast balloon (warm red
   // band, a toast slab swinging under the basket), the splash droplet (cyan, teardrop
   // envelope), the inventor's patchwork (warm amber, a wooden gear hanging).
-  const BALLOON_THEMES = ['toast', 'splash', 'gear'];
+  const BALLOON_THEMES = ['toast', 'splash', 'apairo'];
+  const balloons = [];                 // exposed for click-picking (project cards)
   BALLOON_THEMES.forEach((theme, i) => {
     const brng = mulberry32((seed ^ (0xba1100 * (i + 1))) >>> 0);
-    const b = makeMontgolfiere(brng, theme);
+    // each project rolls its CRAFT TYPE (montgolfière or dirigible) and a THEME
+    // VARIANT from the software's own skins — a different sky on every load.
+    const b = makeCraft(brng, theme);
+    b.group.userData.balloonTheme = theme;
     group.add(b.group);
-    ships.push({ group: b.group, base: new THREE.Vector3(), prop: null,
-      drift: new THREE.Vector3((brng() * 2 - 1) * 6, 2 + brng() * 2, (brng() * 2 - 1) * 6),
+    balloons.push({ group: b.group, theme });
+    // NB: drift.y must stay tiny — an earlier +2..4 u/s climb sent every balloon out
+    // of the corridor within seconds, so they were effectively never seen.
+    ships.push({ group: b.group, base: new THREE.Vector3(), prop: null, anim: b.anim || null,
+      drift: new THREE.Vector3((brng() * 2 - 1) * 6, (brng() - 0.5) * 0.8, (brng() * 2 - 1) * 6),
       bob: brng() * Math.PI * 2, spin: (brng() - 0.5) * 0.06, heading: brng() * Math.PI * 2,
-      rare: true });   // rare spawn band: high and precious, like the B-612
+      balloon: true });   // slightly high band, but near the flight corridor
   });
 
   // ================= construction horizon guide (non-photo-blue) =================
@@ -210,6 +217,34 @@ export function buildCroquis(stage, container, seed) {
   container.addEventListener('pointermove', onMove);
   container.addEventListener('pointerleave', onLeave);
 
+  // ---- throttle ----
+  // Keys are TOGGLES, not holds: most laptop touchpads are disabled by the OS while
+  // a key is held ("disable while typing"), so hold-a-key would freeze the steering.
+  //   ↑ / Z / W  — toggle boost (press again to cruise; also resumes from a stop)
+  //   ↓ / S / Space — toggle a full stop (hang among the clouds)
+  // Holding the POINTER (mouse button / finger) still boosts while held — same
+  // device as the steering, so nothing conflicts.
+  let boostHold = false, boostLatch = false, stopped = false;
+  let speedF = 1;                                     // smoothed speed factor
+  const onDown = () => { boostHold = true; stopped = false; };
+  const onUp = () => { boostHold = false; };
+  const isBoostKey = (k) => k === 'ArrowUp' || k === 'z' || k === 'Z' || k === 'w' || k === 'W';
+  const isStopKey = (k) => k === 'ArrowDown' || k === 's' || k === 'S' || k === ' ';
+  const onKeyDown = (e) => {
+    if (e.repeat) return;
+    if (isBoostKey(e.key)) {
+      if (stopped) stopped = false;          // first press resumes, second boosts
+      else boostLatch = !boostLatch;
+      e.preventDefault();
+    } else if (isStopKey(e.key)) {
+      stopped = !stopped; boostLatch = false;
+      e.preventDefault();
+    }
+  };
+  container.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('keydown', onKeyDown);
+
   const _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _u = new THREE.Vector3();
   const _d = new THREE.Vector3(), _flat = new THREE.Vector3();
   const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -229,7 +264,11 @@ export function buildCroquis(stage, container, seed) {
   const seedField = () => {
     for (const cl of clusters) { scatter(cl.base, pos, 60, 820, 380, CORRIDOR_Y); rebuildCluster(cl); }
     for (const tw of towers) { scatter(tw.base, pos, 120, 780, 460, [-120, 60]); tw.group.position.copy(tw.base); }
-    for (const sh of ships) { scatter(sh.base, pos, 200, 700, 420, [-200, 240]); sh.group.position.copy(sh.base); }
+    for (const sh of ships) {
+      scatter(sh.base, pos, 200, 700, sh.balloon ? 150 : 420,
+        sh.balloon ? [-20, 150] : [-200, 240]);
+      sh.group.position.copy(sh.base);
+    }
     field.instanceMatrix.needsUpdate = true;
     if (field.instanceColor) field.instanceColor.needsUpdate = true;
   };
@@ -240,7 +279,7 @@ export function buildCroquis(stage, container, seed) {
   const dist2 = SPAWN * 1.55, dist2sq = dist2 * dist2;   // recycle envelope (> any spawn radius)
 
   return {
-    group, camera, isCroquis: true,
+    group, camera, isCroquis: true, balloons,
     update(t, dt) {
       // ---------- origin rebase FIRST (infinite-flight precision): shift the whole
       // pool + pos before the camera/ships are placed from them this frame, so camera
@@ -267,7 +306,11 @@ export function buildCroquis(stage, container, seed) {
 
       _fwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
       forward.copy(_fwd);
-      pos.addScaledVector(_fwd, (reduceMotion ? SPEED * 0.5 : SPEED) * dt);
+      // throttle: stop wins; easing makes it feel like leaning forward / flaring to
+      // a halt rather than flipping a speed switch
+      const speedTarget = stopped ? 0 : (boostHold || boostLatch) ? 2.6 : 1;
+      speedF += (speedTarget - speedF) * Math.min(1, dt * 2.2);
+      pos.addScaledVector(_fwd, (reduceMotion ? SPEED * 0.5 : SPEED) * speedF * dt);
       const bob = reduceMotion ? 0 : Math.sin(t * 1.9) * 0.6;
       camera.position.copy(pos); camera.position.y += bob;
 
@@ -308,12 +351,16 @@ export function buildCroquis(stage, container, seed) {
         _d.subVectors(sh.base, camPos);
         const along = _d.dot(_fwd);
         if (along < -BEHIND * 1.6 || _d.lengthSq() > dist2sq) {
-          scatter(sh.base, camPos, SPAWN - 30, 130, 420, sh.rare ? [-40, 120] : [-220, 260]);
+          // balloons respawn close to the flight corridor so you actually MEET them;
+          // other ships (and the B-612) keep their wide, rarer bands.
+          scatter(sh.base, camPos, SPAWN - 30, 130, sh.balloon ? 150 : 420,
+            sh.rare ? [-40, 120] : sh.balloon ? [-20, 150] : [-220, 260]);
         }
         sh.group.position.copy(sh.base);
         sh.group.position.y += Math.sin(t * 0.6 + sh.bob) * 3;
         sh.group.rotation.y = sh.heading + t * sh.spin;
         if (sh.prop) sh.prop.rotation.z += dt * 4;
+        if (sh.anim) sh.anim(t);            // themed touches (flame, drips, gear)
       }
 
       // ---------- horizon guide + veil ----------
@@ -330,6 +377,9 @@ export function buildCroquis(stage, container, seed) {
     dispose() {
       container.removeEventListener('pointermove', onMove);
       container.removeEventListener('pointerleave', onLeave);
+      container.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('keydown', onKeyDown);
     },
   };
 }
@@ -470,61 +520,184 @@ function makeSkiff(rng) {
   g.scale.setScalar(0.7 + rng() * 0.6);
   return { group: g };
 }
-// a hot-air balloon in the pencil style, themed per project. Envelope + basket get
-// the inverted-hull graphite contour like everything else; the theme shows in the
-// pale pastel envelope tint, its shape, and a small charm hanging under the basket.
-function makeMontgolfiere(rng, theme = 'toast') {
+// ---- the project craft: montgolfière OR dirigible × the software's own skins ----
+// Each load rolls a craft type and a theme variant per project, so the sky differs
+// every visit. Tints stay pale pencil-pastel, but the BAND carries a legible brand
+// hue (the earlier all-pastel toast balloon read as unexplained pink).
+const CRAFT_VARIANTS = {
+  toast: [   // Toaster's real skins: brutalist red / café espresso / Arcade Quest
+    { env: 0xf2e6d0, band: 0xd94f45, band2: null,     charm: 'toast', charmCol: 0xcaa15a }, // red
+    { env: 0xe7d7c3, band: 0x8a6a4f, band2: 0xd8c3a8, charm: 'toast', charmCol: 0x6b4a33 }, // café
+    { env: 0xdde8d4, band: 0x7fd08a, band2: 0xc79ede, charm: 'toast', charmCol: 0xcaa15a }, // arcade
+  ],
+  splash: [  // Splasher: dark-aqua tool skin / the cartoon wave
+    { env: 0xc6dee8, band: 0x6f9fc4, band2: null,     charm: 'drop', charmCol: 0xa8d4e4, shape: 'drop' },
+    { env: 0xe2eef2, band: 0x6aa5cc, band2: 0xffffff, charm: 'drop', charmCol: 0x8fc8de, shape: 'drop' }, // wave
+  ],
+  apairo: [  // Apairo: the robotics data factory by the sea — gold-sand / sea-and-gold
+    { env: 0xf0e6cc, band: 0xd9a441, band2: null,     charm: 'robot', charmCol: 0xcfd6da },
+    { env: 0xdfeaf0, band: 0x9ec4d4, band2: 0xd9a441, charm: 'robot', charmCol: 0xcfd6da },
+  ],
+  gear: [    // Origin: the inventor's wood-and-canvas craft (currently not flown)
+    { env: 0xe9dcc2, band: 0xd4b78a, band2: null,     charm: 'gear', charmCol: 0xb8966a },
+  ],
+};
+
+function makeCraft(rng, project) {
+  const variants = CRAFT_VARIANTS[project] || CRAFT_VARIANTS.toast;
+  const V = variants[(rng() * variants.length) | 0];
+  const dirigible = rng() < 0.5;
+  return dirigible ? makeDirigibleCraft(rng, V) : makeBalloonCraft(rng, V);
+}
+
+// the charm swinging under the craft + its themed micro-effect (kept subtle)
+function makeCharm(rng, V, g, y) {
+  const mat = new THREE.MeshLambertMaterial({ color: V.charmCol, flatShading: true });
+  let charm;
+  if (V.charm === 'toast') {
+    charm = outlined(new THREE.BoxGeometry(4.2, 4.8, 1.1), mat, 0.35, (rng() * 1e9) | 0, g);
+  } else if (V.charm === 'drop') {
+    const geo = new THREE.SphereGeometry(2.2, 8, 6); geo.scale(1, 1.5, 1);
+    charm = outlined(geo, mat, 0.35, (rng() * 1e9) | 0, g);
+  } else if (V.charm === 'robot') {
+    // a little pale-steel robot passenger with a blinking amber eye + antenna
+    charm = new THREE.Group();
+    outlined(new THREE.BoxGeometry(2.8, 3, 2.2), mat, 0.3, (rng() * 1e9) | 0, charm);
+    outlined(new THREE.BoxGeometry(2.0, 1.6, 1.8), mat, 0.3, (rng() * 1e9) | 0, charm).position.y = 2.3;
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.4, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0xe0b04a, transparent: true, opacity: 0.9 }));
+    eye.position.set(0, 2.3, 1.02); charm.add(eye);
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.6, 5),
+      new THREE.MeshLambertMaterial({ color: ROPE, flatShading: true }));
+    ant.position.y = 3.9; charm.add(ant);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.32, 6, 5),
+      new THREE.MeshBasicMaterial({ color: 0xe0b04a }));
+    tip.position.y = 4.8; charm.add(tip);
+    g.add(charm);
+    charm.userData.eye = eye;
+  } else {
+    charm = new THREE.Group();
+    charm.add(new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.7, 6, 8), mat));
+    for (let s = 0; s < 2; s++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.6, 0.7), mat);
+      spoke.rotation.z = s * Math.PI / 2; charm.add(spoke);
+    }
+    g.add(charm);
+  }
+  charm.position.y = y;
+  const ph = rng() * 9;
+  const parts = { charm, ph };
+  if (V.charm === 'drop') {
+    parts.drips = [];
+    for (let d = 0; d < 3; d++) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.55, 6, 5),
+        new THREE.MeshBasicMaterial({ color: V.charmCol, transparent: true }));
+      g.add(m); parts.drips.push({ m, ph: d / 3 });
+    }
+  }
+  return parts;
+}
+function animCharm(p, t, y) {
+  p.charm.rotation.z = Math.sin(t * 0.9 + p.ph) * 0.2;   // gentle pendulum swing
+  if (p.drips) for (const dr of p.drips) {
+    const f = (t * 0.25 + dr.ph) % 1;
+    dr.m.position.y = y - 2 - f * 9;
+    dr.m.material.opacity = Math.max(0, 0.8 - f);
+  }
+  const eye = p.charm.userData && p.charm.userData.eye;
+  if (eye) {  // the robot blinks: mostly lit, a quick wink now and then
+    eye.material.opacity = Math.sin(t * 1.7 + p.ph) > -0.9 ? 0.9 : 0.15;
+  }
+}
+
+function makeBalloonCraft(rng, V) {
   const g = new THREE.Group();
   const wood = new THREE.MeshLambertMaterial({ color: WOOD1, flatShading: true });
-  // pale pastel tints — "beaucoup de couleur mais pâle", never saturated
-  const TINTS = {
-    toast:  { env: 0xe8c8bc, band: 0xd98f82, charm: 0xcaa15a },  // warm red, toast slab
-    splash: { env: 0xc6dee8, band: 0x8fbcd4, charm: 0xa8d4e4 },  // cyan, droplet
-    gear:   { env: 0xe9dcc2, band: 0xd4b78a, charm: 0xb8966a },  // amber, wooden gear
-  };
-  const tint = TINTS[theme] || TINTS.toast;
-  const cloth = new THREE.MeshLambertMaterial({ color: tint.env, flatShading: true });
-
-  // envelope: sphere for toast/gear, a stretched teardrop for the splash droplet
+  const cloth = new THREE.MeshLambertMaterial({ color: V.env, flatShading: true });
+  // envelope: round, or a stretched teardrop for the splash droplet shape
   const env = new THREE.SphereGeometry(1, 14, 10);
-  if (theme === 'splash') { env.scale(13, 17, 13); env.translate(0, 2, 0); }
+  if (V.shape === 'drop') { env.scale(13, 17, 13); env.translate(0, 2, 0); }
   else env.scale(15, 16, 15);
   outlined(env, cloth, 0.5, (rng() * 1e9) | 0, g);
-  // pastel band around the equator
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(
-    theme === 'splash' ? 12.6 : 14.6, theme === 'splash' ? 12.6 : 14.6, 4.5, 14, 1, true),
-    new THREE.MeshBasicMaterial({ color: tint.band, side: THREE.DoubleSide }));
-  band.position.y = theme === 'splash' ? 2 : 0;
-  g.add(band);
-
+  // brand band(s) around the equator — the legible identity stripe
+  const bandR = V.shape === 'drop' ? 12.6 : 14.6;
+  const bandY = V.shape === 'drop' ? 2 : 0;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(bandR, bandR, 4.5, 14, 1, true),
+    new THREE.MeshBasicMaterial({ color: V.band, side: THREE.DoubleSide }));
+  band.position.y = bandY; g.add(band);
+  if (V.band2) {
+    const b2 = new THREE.Mesh(new THREE.CylinderGeometry(bandR * 0.97, bandR * 0.97, 1.6, 14, 1, true),
+      new THREE.MeshBasicMaterial({ color: V.band2, side: THREE.DoubleSide }));
+    b2.position.y = bandY - 3.6; g.add(b2);
+  }
   // basket + rigging
-  const basket = new THREE.BoxGeometry(6, 4.5, 6);
-  outlined(basket, wood, 0.4, (rng() * 1e9) | 0, g).position.y = -22;
-  const rig = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+  outlined(new THREE.BoxGeometry(6, 4.5, 6), wood, 0.4, (rng() * 1e9) | 0, g).position.y = -22;
+  g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-2.6, -19.8, -2.6), new THREE.Vector3(-7, -8, -7),
     new THREE.Vector3(2.6, -19.8, -2.6), new THREE.Vector3(7, -8, -7),
     new THREE.Vector3(-2.6, -19.8, 2.6), new THREE.Vector3(-7, -8, 7),
     new THREE.Vector3(2.6, -19.8, 2.6), new THREE.Vector3(7, -8, 7),
-  ]), new THREE.LineBasicMaterial({ color: ROPE }));
-  g.add(rig);
+  ]), new THREE.LineBasicMaterial({ color: ROPE })));
+  // burner flame pulsing at the envelope mouth (all balloons have a burner)
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.6, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffb14a, transparent: true, opacity: 0.7 }));
+  flame.position.y = -17.5; g.add(flame);
 
-  // the project charm swinging under the basket
-  if (theme === 'toast') {
-    const slab = new THREE.BoxGeometry(4.2, 4.8, 1.1);
-    outlined(slab, new THREE.MeshLambertMaterial({ color: tint.charm, flatShading: true }),
-      0.35, (rng() * 1e9) | 0, g).position.y = -28;
-  } else if (theme === 'splash') {
-    const drop = new THREE.SphereGeometry(2.2, 8, 6); drop.scale(1, 1.5, 1);
-    outlined(drop, new THREE.MeshLambertMaterial({ color: tint.charm, flatShading: true }),
-      0.35, (rng() * 1e9) | 0, g).position.y = -28;
-  } else {
-    const gear = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.9, 6, 8),
-      new THREE.MeshLambertMaterial({ color: tint.charm, flatShading: true }));
-    gear.position.y = -28; g.add(gear);
-  }
-
+  const charm = makeCharm(rng, V, g, -28);
+  const anim = (t) => {
+    flame.material.opacity = 0.35 + Math.abs(Math.sin(t * 7 + charm.ph)) * 0.45;
+    flame.scale.y = 0.8 + Math.abs(Math.sin(t * 7 + charm.ph)) * 0.5;
+    animCharm(charm, t, -28);
+  };
   g.scale.setScalar(0.9 + rng() * 0.5);
-  return { group: g };
+  return { group: g, anim };
+}
+
+function makeDirigibleCraft(rng, V) {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ color: WOOD2, flatShading: true });
+  const cloth = new THREE.MeshLambertMaterial({ color: V.env, flatShading: true });
+  const envelope = new THREE.SphereGeometry(1, 14, 10); envelope.scale(26, 11, 11);
+  outlined(envelope, cloth, 0.5, (rng() * 1e9) | 0, g);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(11.2, 11.2, 5, 14, 1, true),
+    new THREE.MeshBasicMaterial({ color: V.band, side: THREE.DoubleSide }));
+  band.rotation.z = Math.PI / 2; g.add(band);
+  if (V.band2) {
+    const b2 = new THREE.Mesh(new THREE.CylinderGeometry(10.9, 10.9, 2, 14, 1, true),
+      new THREE.MeshBasicMaterial({ color: V.band2, side: THREE.DoubleSide }));
+    b2.rotation.z = Math.PI / 2; b2.position.x = 6; g.add(b2);
+  }
+  outlined(new THREE.BoxGeometry(11, 4, 5.5), wood, 0.4, (rng() * 1e9) | 0, g).position.y = -13;
+  g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-5, -11, 0), new THREE.Vector3(-8, -3, 0),
+    new THREE.Vector3(5, -11, 0), new THREE.Vector3(8, -3, 0),
+  ]), new THREE.LineBasicMaterial({ color: ROPE })));
+  // stern propeller: a great wooden GEAR for the inventor, plain blades otherwise
+  const prop = new THREE.Group(); prop.position.set(-28, 0, 0); g.add(prop);
+  if (V.charm === 'gear') {
+    prop.add(new THREE.Mesh(new THREE.TorusGeometry(4.6, 1.0, 6, 8),
+      new THREE.MeshLambertMaterial({ color: WOOD2, flatShading: true })));
+    for (let s = 0; s < 4; s++) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.8, 8.6, 1.6), wood);
+      blade.rotation.z = (s / 4) * Math.PI; prop.add(blade);
+    }
+  } else {
+    for (let s = 0; s < 2; s++) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.6, 9, 1.4), wood);
+      blade.rotation.z = s * Math.PI / 2; prop.add(blade);
+    }
+  }
+  prop.rotation.y = Math.PI / 2;
+
+  // the charm hangs under the gondola (skip for gear — its gear IS the propeller)
+  const charm = V.charm === 'gear' ? null : makeCharm(rng, V, g, -19);
+  const ph = rng() * 9;
+  const anim = (t) => {
+    prop.rotation.z = t * (V.charm === 'gear' ? 0.9 : 2.2) + ph;
+    if (charm) animCharm(charm, t, -19);
+  };
+  g.scale.setScalar(0.9 + rng() * 0.4);
+  return { group: g, anim };
 }
 
 // the B-612 — a tiny asteroid-world, kept precious

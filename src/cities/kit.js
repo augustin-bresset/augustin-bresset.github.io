@@ -170,6 +170,61 @@ export function makePortal(accent = '#e9dcc0') {
   };
 }
 
+// WALL PORTAL — the same non-Euclidean window, but RECTANGULAR and mounted flush
+// against a building façade (a doorway to elsewhere, Portal-style). Give it the
+// wall's outward direction: navigation reads userData.portalNormal and approaches
+// perpendicular to the face, so the dive flies straight AT the wall and through.
+// Parent it to the building group so the normal follows the building's rotation.
+// SIZE FLOOR: the dive ends at orbit radius ~3.6 with the camera near plane at 3,
+// so the pane must cover the whole frame from there — at fov 42°/16:9 that means
+// w ≥ ~5.0 and h ≥ ~2.8. Default is a wide barn-door. Returns { group, update }.
+export function makeWallPortal(accent = '#e9dcc0', w = 5.6, h = 4.6) {
+  const g = new THREE.Group();
+  const ac = new THREE.Color(accent);
+
+  // the window pane, flush on the wall plane, facing local +Z
+  const pane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), makePortalWindowMaterial());
+  pane.position.set(0, h / 2, 0.1);
+  pane.castShadow = false; pane.receiveShadow = false;
+  pane.userData.isPortalDisc = true;
+  portalRender.registerDisc(pane);         // hidden during the virtual-camera RT pass
+  g.add(pane);
+
+  // timber door-frame around the opening
+  const fw = 0.34, fd = 0.4;
+  const frameCol = 0x5c4126;
+  g.add(box(w + fw * 2, fw, fd, frameCol, { pos: [0, h + fw / 2, 0.06] }));
+  g.add(box(fw, h, fd, frameCol, { pos: [-(w + fw) / 2, h / 2, 0.06] }));
+  g.add(box(fw, h, fd, frameCol, { pos: [(w + fw) / 2, h / 2, 0.06] }));
+  g.add(box(w + fw * 2, 0.24, fd + 0.2, frameCol, { pos: [0, 0.12, 0.1] })); // sill
+
+  // a soft accent glow lining the inside of the frame
+  const rimMat = new THREE.MeshStandardMaterial({ color: ac, emissive: ac, emissiveIntensity: 1.4 });
+  const rimGeoV = new THREE.BoxGeometry(0.1, h, 0.12);
+  for (const dx of [-(w / 2 - 0.06), w / 2 - 0.06]) {
+    const r = new THREE.Mesh(rimGeoV, rimMat);
+    r.position.set(dx, h / 2, 0.12); r.castShadow = false;
+    g.add(r);
+  }
+  const rimTop = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, 0.12), rimMat);
+  rimTop.position.set(0, h - 0.06, 0.12); rimTop.castShadow = false;
+  g.add(rimTop);
+
+  g.traverse((o) => { if (o.isMesh || o.isSprite) o.userData.portal = true; });
+  g.userData.portal = true;
+  // face normal (local +Z, out of the wall) — navigation transforms it to world
+  // space via matrixWorld, so a rotated building rotates the approach with it.
+  g.userData.portalNormal = new THREE.Vector3(0, 0, 1);
+  g.userData.portalCenter = new THREE.Vector3(0, h / 2, 0);
+
+  return {
+    group: g,
+    update(t) {
+      rimMat.emissiveIntensity = 1.1 + Math.sin(t * 1.6) * 0.4;
+    },
+  };
+}
+
 // The portal disc as a genuine WINDOW: the fragment shader samples the shared render
 // target by SCREEN position (gl_FragCoord / resolution), not by the disc's own UVs.
 // That makes the disc show exactly the part of the virtual-camera frame it covers on
@@ -384,8 +439,10 @@ export function tagPickable(root, cityId) {
 // enough — but we set it on every child too, so a click anywhere on the structure
 // (or its floating marker) opens that landmark's field note.
 export function tagPOI(root, poiId) {
-  root.userData.poi = poiId;
-  root.traverse((o) => { o.userData.poi = poiId; });
+  // never claim portal meshes: a wall portal can live INSIDE a POI-tagged building
+  // (e.g. the atelier's doorway) and must stay clickable as a portal.
+  if (!root.userData.portal) root.userData.poi = poiId;
+  root.traverse((o) => { if (!o.userData.portal) o.userData.poi = poiId; });
 }
 
 // Deterministic small PRNG so a city's sprawl is stable across frames.
