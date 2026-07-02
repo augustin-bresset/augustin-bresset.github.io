@@ -12,22 +12,22 @@ export const CITIES = [
     // modern data-factory by the sea (apéro on the beach) → coastal lowland.
     // Weighted affinity: strongly prefers the shore (beach) over inland plains so
     // it actually settles by the water (see also the coastal bonus in placement.js).
-    id: 'apairo', build: buildApairo, radius: 38,
+    id: 'apairo', build: buildApairo, radius: 80,   // the flagship metropolis — by far the biggest pad
     affinity: { beach: 1.0, plains: 0.5, savanna: 0.45 },
   },
   {
     // neon forge → barren scrubland, drawn to the lone volcano (see placement.js)
-    id: 'toaster', build: buildToaster, radius: 38,
+    id: 'toaster', build: buildToaster, radius: 50,
     affinity: ['plains', 'savanna', 'desert'],
   },
   {
     // BEV / water-sensor lab → wetlands & shoreline
-    id: 'splasher', build: buildSplasher, radius: 36,
+    id: 'splasher', build: buildSplasher, radius: 40,
     affinity: ['marsh', 'beach', 'plains'],
   },
   {
-    // Augustin's wind-city on a climbing cliff → high, breezy ground
-    id: 'about', build: buildAbout, radius: 34,
+    // Augustin's wind-inventor town (l'Arbre de Transmission) → high, breezy ground
+    id: 'about', build: buildAbout, radius: 48,
     affinity: ['hills', 'mountain', 'forest'],
   },
 ];

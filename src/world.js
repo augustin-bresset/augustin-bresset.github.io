@@ -16,6 +16,7 @@ import { buildVolcano } from './bricks/volcano.js';
 import { buildClouds } from './bricks/clouds.js';
 import { buildFlying } from './bricks/flying.js';
 import { buildBridges } from './bricks/bridges.js';
+import { buildSkyways } from './bricks/skyways.js';
 import { smoothstep, mulberry32 } from './gen/noise.js';
 import { buildIslandField } from './gen/islands.js';
 import { ACTIVE } from './themes.js';
@@ -157,8 +158,21 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   }
 
   // 6. terrain mesh (its edge is far past the fog + the camera clamp; in the
-  // archipelago, masked cells collapse to nothing so only the islands remain)
-  const terrain = buildTerrainMesh(field, islandField ? { cellVisible: islandField.cellVisible } : {});
+  // archipelago, masked cells collapse to nothing so only the islands remain).
+  // CITY-TERRAIN FUSION: the ground around each city is tinted toward that city's
+  // own ground colour, so the pad reads as growing out of the landscape instead of
+  // a plate dropped onto it.
+  const CITY_GROUND = {
+    apairo: 0xd8d2c2, toaster: 0x3a3f49, splasher: 0x212a36, about: 0xb6a07e,
+  };
+  const groundZones = cityPads.map((p) => ({
+    x: p.x, z: p.z, r: p.city.radius,
+    color: CITY_GROUND[p.city.id] ?? 0xb6a07e,
+  }));
+  const terrain = buildTerrainMesh(field, {
+    ...(islandField ? { cellVisible: islandField.cellVisible } : {}),
+    zones: groundZones,
+  });
   group.add(terrain.mesh);
 
   // 6b. scenic orientation: face the home camera toward the tallest distant terrain
@@ -180,7 +194,9 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // 9. cities
   for (const pad of cityPads) {
     const built = pad.city.build();
-    built.group.position.set(pad.x, pad.y, pad.z);
+    // slightly EMBEDDED: the flatten is deliberately partial, so sinking the city
+    // ~half a unit hides any residual relief under building bases (nothing floats)
+    built.group.position.set(pad.x, pad.y - 0.5, pad.z);
     group.add(built.group);
     if (built.update) updaters.push((t, dt) => built.update(t, dt));
     cities.push({
@@ -197,6 +213,16 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
     const volcano = buildVolcano(volcanoPad, volcanoPad.scale);
     group.add(volcano.group);
     updaters.push((t, dt) => volcano.update(t, dt));
+  }
+
+  // 10b. SKYWAYS — a sparse random subset of elevated tubes linking cities, with
+  // travelling data-pulses, plus two quiet aircraft high above (the croquis nod).
+  // On floating worlds the tubes glide across the void between islands (pylons
+  // only where there is land under them) and the aircraft fly all the same.
+  {
+    const sky = buildSkyways(field, cityPads, seed, { islands: islandField });
+    group.add(sky.group);
+    updaters.push((t, dt) => sky.update(t, dt));
   }
 
   // 11. clouds — a few drifters overhead + a soft distant band at the fog horizon
@@ -343,33 +369,41 @@ function scenicDirection(field, half, islandField) {
   return bestTh;
 }
 
-// Flatten a smooth circular plateau into the heightfield at (ax,az).
+// Settle a city into the heightfield at (ax,az) — PARTIAL flattening, not a stamped
+// plateau: the core keeps a whisper of the original relief (the city deck hides the
+// residual), and a WIDE gentle halo eases the surrounding terrain toward the city
+// level, so the settlement sits in a natural shelf instead of on a dropped plate.
 function flattenPlateau(field, ax, az, radius) {
   const { N, idx, gx, gz, heights, size } = field;
   const half = size / 2;
   const toI = (w) => Math.round((w + half) / size * N);
   const ci = toI(ax), cj = toI(az);
-  const cellsR = Math.ceil(radius / (size / N)) + 3;
+  const halo = radius * 2.1;
+  const cellsR = Math.ceil(halo / (size / N)) + 3;
 
   let sum = 0, cnt = 0;
   for (let dj = -cellsR; dj <= cellsR; dj++)
     for (let di = -cellsR; di <= cellsR; di++) {
       const i = ci + di, j = cj + dj;
       if (i < 0 || j < 0 || i > N || j > N) continue;
+      if (Math.hypot(gx(i) - ax, gz(j) - az) > radius) continue;
       sum += heights[idx(i, j)]; cnt++;
     }
   let target = cnt ? sum / cnt : 10;
   target = Math.max(7, Math.min(target, 40));
 
-  const blend = radius + 12;
   for (let dj = -cellsR; dj <= cellsR; dj++)
     for (let di = -cellsR; di <= cellsR; di++) {
       const i = ci + di, j = cj + dj;
       if (i < 0 || j < 0 || i > N || j > N) continue;
       const dist = Math.hypot(gx(i) - ax, gz(j) - az);
-      if (dist > blend) continue;
+      if (dist > halo) continue;
       const k = idx(i, j);
-      const w = 1 - smoothstep(radius, blend, dist);
+      // core: strong but NOT total (≤0.9) — a light plain, not a snapped plane;
+      // halo: a light distant pull so the land ramps up/down to meet the city
+      const wCore = (1 - smoothstep(radius * 0.9, radius * 1.25, dist)) * 0.94;
+      const wHalo = (1 - smoothstep(radius * 1.05, halo, dist)) * 0.35;
+      const w = Math.min(0.95, wCore + wHalo);
       heights[k] = heights[k] * (1 - w) + target * w;
     }
   return target;

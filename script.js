@@ -1,6 +1,7 @@
 // script.js — entry point. Boots the stage, resolves the active WORLD from the URL,
 // builds it (a grounded terrain world, or the croquis fly-through), wires the camera,
 // UI and navigation, then runs the render loop. The top-right button cycles worlds.
+import * as THREE from 'three';
 import { createStage } from './src/stage.js';
 import { CameraRig } from './src/camera.js';
 import { buildWorld, WORLD } from './src/world.js';
@@ -98,7 +99,67 @@ function boot() {
     ui.setLegend(false);
     ui.setBack(false);
     ui.showHint('croquisHint');
-    stage.onFrame((t, dt) => croquis.update(t, dt));
+
+    // ---- clickable project balloons: a short card with links, pinned to the craft.
+    // Picking is a GENEROUS screen-space test, not a precise raycast: steering
+    // follows the pointer, so the camera keeps turning while you aim — the craft
+    // slides under the cursor and an exact mesh hit is nearly impossible to land.
+    const BALLOON_ACCENT = { toast: '#e10600', splash: '#3b82f6', apairo: '#dda42a', gear: '#c4763a' };
+    const v = new THREE.Vector3();
+    let opened = null;                        // { group, theme } of the open card
+    let down = null;
+    const el = stage.renderer.domElement;
+    const pickBalloon = (cx, cy) => {
+      const r = el.getBoundingClientRect();
+      let best = null, bestD = Infinity;
+      for (const b of croquis.balloons) {
+        v.copy(b.group.position);
+        v.sub(croquis.camera.position);
+        const dist = v.length();
+        if (dist > 750) continue;                       // lost in the fog anyway
+        v.copy(b.group.position).project(croquis.camera);
+        if (v.z > 1 || v.z < -1) continue;              // behind the camera
+        const sx = r.left + (v.x * 0.5 + 0.5) * r.width;
+        const sy = r.top + (-v.y * 0.5 + 0.5) * r.height;
+        // apparent radius in px (craft ~28u across) + a fat grace margin
+        const fovScale = (r.height / 2) / Math.tan((croquis.camera.fov / 2) * Math.PI / 180);
+        const rad = Math.max(34, (28 / dist) * fovScale * 1.25);
+        const d = Math.hypot(cx - sx, cy - sy);
+        if (d < rad && d < bestD) { best = b; bestD = d; }
+      }
+      return best;
+    };
+    const placeCard = () => {
+      if (!opened) return;
+      v.copy(opened.group.position); v.y += 8;
+      v.project(croquis.camera);
+      if (v.z > 1) { opened = null; ui.hideNote(); return; }   // drifted behind us
+      const r = el.getBoundingClientRect();
+      const x = r.left + (v.x * 0.5 + 0.5) * r.width;
+      const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+      ui.positionNote(x, y, x > r.left + r.width * 0.52 ? 'left' : 'right');
+    };
+    el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+    el.addEventListener('pointerup', (e) => {
+      if (!down) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      down = null;
+      if (moved > 14) return;
+      const b = pickBalloon(e.clientX, e.clientY);
+      if (b) {
+        opened = b;
+        ui.showNote('croquis', b.theme, BALLOON_ACCENT[b.theme]);
+        placeCard();
+      } else if (opened) { opened = null; ui.hideNote(); }
+    });
+    // cursor affordance: show a pointer whenever a craft is within click range
+    el.addEventListener('pointermove', (e) => {
+      el.style.cursor = pickBalloon(e.clientX, e.clientY) ? 'pointer' : 'grab';
+    });
+    document.getElementById('note-close').addEventListener('click', () => { opened = null; ui.hideNote(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && opened) { opened = null; ui.hideNote(); } });
+
+    stage.onFrame((t, dt) => { croquis.update(t, dt); placeCard(); });
     stage.start();
     return;
   }

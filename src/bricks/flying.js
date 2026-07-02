@@ -48,8 +48,8 @@ function makeSkirt(field, cx, cz, rim, depth, seed, profStyle = 0) {
   const profileR = (u) => _profileR(u, profStyle);
   const easeU = (u) => Math.pow(u, 1.3);
 
-  // top ring follows the real terrain height at the island edge, so the skirt meets
-  // cut cliffs (blob boundary through land) as well as the coast with no gap.
+  // top ring follows the real terrain height at the island edge (legacy single-island
+  // path only — the archipelago now uses the grid-exact buildUnderside below).
   const topY = [];
   for (let a = 0; a < SEG; a++) {
     const th = (a / SEG) * Math.PI * 2;
@@ -108,12 +108,120 @@ function makeSkirt(field, cx, cz, rim, depth, seed, profStyle = 0) {
   return geo;
 }
 
+// GRID-EXACT UNDERSIDE — the clean solution. Instead of hanging a separate radial
+// skirt and trying to make its polygon meet the jagged per-cell terrain edge (it
+// never can: gaps, flicker, and whole concave lobes left with terrain but nothing
+// underneath), the underside is a SECOND SURFACE BUILT ON THE SAME GRID as the
+// terrain: every visible cell gets a bottom quad, and boundary vertices reuse the
+// terrain's own heights — top and bottom share their rim vertices EXACTLY, so the
+// island is watertight by construction, whatever its shape.
+// Depth grows with distance-to-edge (BFS over the island's vertices), so small
+// lobes stay thin and big masses grow deep keels; hashed jitter keeps it rocky.
+function buildUnderside(field, cellVisible, seed) {
+  const { N, verts, heights, idx, gx, gz, size } = field;
+  const n = verts * verts;
+
+  // how many visible cells touch each vertex (0 = not on an island, 4 = interior)
+  const touch = new Uint8Array(n);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      if (!cellVisible(i, j)) continue;
+      touch[idx(i, j)]++; touch[idx(i + 1, j)]++;
+      touch[idx(i, j + 1)]++; touch[idx(i + 1, j + 1)]++;
+    }
+  }
+
+  // BFS distance (in vertices) from the island boundary
+  const dist = new Float32Array(n).fill(-1);
+  const qi = [], qj = [];
+  let head = 0;
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const k = idx(i, j);
+      if (touch[k] > 0 && (touch[k] < 4 || i === 0 || j === 0 || i === N || j === N)) {
+        dist[k] = 0; qi.push(i); qj.push(j);
+      }
+    }
+  }
+  while (head < qi.length) {
+    const i = qi[head], j = qj[head]; head++;
+    const d = dist[idx(i, j)];
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = i + di, nj = j + dj;
+      if (ni < 0 || nj < 0 || ni > N || nj > N) continue;
+      const nk = idx(ni, nj);
+      if (touch[nk] > 0 && dist[nk] < 0) { dist[nk] = d + 1; qi.push(ni); qj.push(nj); }
+    }
+  }
+
+  // per-vertex bottom height: equals the TOP height at the boundary (exact seam),
+  // then dives with distance — saturating so big islands get deep keels and thin
+  // lobes stay shallow. Jitter fades to zero at the seam.
+  const cellW = size / N;
+  const bottomY = new Float32Array(n);
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const k = idx(i, j);
+      if (touch[k] === 0) continue;
+      const dw = Math.max(0, dist[k]) * cellW;
+      const t = Math.min(1, dw / 42);
+      const dive = 275 * (1 - Math.exp(-dw / 80));
+      const jag = (hash2(i * 7 + seed, j * 13) - 0.5) * 44 * t;
+      bottomY[k] = heights[k] - Math.max(0, dive + jag);
+    }
+  }
+
+  // emit one downward-facing quad per visible cell (reversed winding vs the top)
+  let cellCount = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (cellVisible(i, j)) cellCount++;
+  const positions = new Float32Array(cellCount * 2 * 9);
+  const colors = new Float32Array(cellCount * 2 * 9);
+  const col = new THREE.Color();
+  let o = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      if (!cellVisible(i, j)) continue;
+      const x0 = gx(i), x1 = gx(i + 1), z0 = gz(j), z1 = gz(j + 1);
+      const y00 = bottomY[idx(i, j)], y10 = bottomY[idx(i + 1, j)];
+      const y01 = bottomY[idx(i, j + 1)], y11 = bottomY[idx(i + 1, j + 1)];
+      // reversed order → normals face down/outward
+      const tris = [
+        [x0, y00, z0, x1, y10, z0, x0, y01, z1],
+        [x1, y10, z0, x1, y11, z1, x0, y01, z1],
+      ];
+      for (const [ax, ay, az, bx, by, bz, cx2, cy, cz2] of tris) {
+        const my = (ay + by + cy) / 3;
+        const dTop = (heights[idx(i, j)] - my);        // how far below the surface
+        if (dTop < 12) col.copy(DIRT).lerp(MOSS, hash2(i, j) * 0.5);
+        else col.copy(ROCK).lerp(ROCK_D, Math.min(1, dTop / 170));
+        if (dTop > 180) col.lerp(DEEP, Math.min(1, (dTop - 180) / 160));
+        col.offsetHSL(0, 0, (hash2(i * 3, j) - 0.5) * 0.06);
+        positions[o] = ax; positions[o + 1] = ay; positions[o + 2] = az;
+        positions[o + 3] = bx; positions[o + 4] = by; positions[o + 5] = bz;
+        positions[o + 6] = cx2; positions[o + 7] = cy; positions[o + 8] = cz2;
+        for (let v = 0; v < 3; v++) {
+          colors[o + v * 3] = col.r; colors[o + v * 3 + 1] = col.g; colors[o + v * 3 + 2] = col.b;
+        }
+        o += 9;
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
 export function buildFlying(field, half, seed, opts = {}) {
   const group = new THREE.Group();
   group.name = 'flying';
   const rand = mulberry32((seed ^ 0xf1a1) >>> 0);
   const rockMat = new THREE.MeshStandardMaterial({
     vertexColors: true, flatShading: true, roughness: 1, metalness: 0,
+    // double-sided: looking up from under an island must never reveal see-through
+    // interior faces where the collar meets the terrain
+    side: THREE.DoubleSide,
   });
 
   // --- 1. rocky undersides ---
@@ -121,9 +229,16 @@ export function buildFlying(field, half, seed, opts = {}) {
     ? opts.islands.rims
     : null;
 
-  if (islands) {
-    // archipelago: one skirt per carved island, hugging its own edge.
-    // Each island gets a seed-derived profile style for visual variety.
+  if (opts.islands && opts.islands.cellVisible) {
+    // archipelago: ONE grid-exact underside covering every visible cell — top and
+    // bottom share their boundary vertices, so there is no seam to tune and no
+    // lobe can end up with terrain but nothing underneath.
+    const geo = buildUnderside(field, opts.islands.cellVisible, (seed & 1023));
+    const m = new THREE.Mesh(geo, rockMat);
+    m.name = 'flying-underside';
+    group.add(m);
+  } else if (islands) {
+    // legacy per-rim skirts (kept for callers without a cell mask)
     let s = 0;
     for (const isl of islands) {
       const depth = 150 + (isl.R || 160) * 0.75;
