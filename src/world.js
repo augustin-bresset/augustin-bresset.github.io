@@ -164,6 +164,7 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // a plate dropped onto it.
   const CITY_GROUND = {
     apairo: 0xd8d2c2, toaster: 0x3a3f49, splasher: 0x212a36, about: 0xb6a07e,
+    projector: 0x241f2b, rubicon: 0x3a4a2c,
   };
   const groundZones = cityPads.map((p) => ({
     x: p.x, z: p.z, r: p.city.radius,

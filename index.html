@@ -39,6 +39,7 @@
       <span data-key="back">Back</span>
     </button>
     <button id="theme-btn" class="ui-btn ui-btn--theme" title="Change world">Island</button>
+    <button id="help-btn" class="ui-btn ui-btn--help" title="How it works">?</button>
     <button id="lang-btn" class="ui-btn ui-btn--lang">FR</button>
   </div>
 
@@ -52,6 +53,16 @@
     <button id="note-close" class="note-close" aria-label="Close">✕</button>
     <div id="note-body"></div>
   </aside>
+
+  <!-- How-it-works popup: a "?" button reopens it any time; auto-shown on first visit -->
+  <div id="help-modal" class="help-modal hidden" role="dialog" aria-label="How it works">
+    <div class="help-card">
+      <button id="help-close" class="note-close" aria-label="Close">✕</button>
+      <h3 id="help-title" class="help-title">How this works</h3>
+      <ul id="help-list" class="help-list"></ul>
+      <button id="help-gotit" class="ui-btn help-gotit">Got it</button>
+    </div>
+  </div>
 
   <script type="module" src="script.js"></script>
 </body>

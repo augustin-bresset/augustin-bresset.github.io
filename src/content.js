@@ -12,13 +12,16 @@ export const CITY_LABELS = {
   apairo: (l) => l === 'fr' ? ['Apairo', 'Données Robotique'] : ['Apairo', 'Robotics Data'],
   toaster: (l) => l === 'fr' ? ['Toaster', 'Annotation 3D'] : ['Toaster', '3D Annotation'],
   splasher: (l) => l === 'fr' ? ['Splasher', 'Étiquetage BEV'] : ['Splasher', 'BEV Labeling'],
+  projector: (l) => l === 'fr' ? ['Projector', 'Relecture Multi-Capteurs'] : ['Projector', 'Multi-Sensor Replay'],
   about: (l) => l === 'fr' ? ['Origin', "L'Inventeur"] : ['Origin', 'The Inventor'],
+  rubicon: (l) => l === 'fr' ? ['Rubicon', 'Bijouterie & ERP'] : ['Rubicon', 'Jewelry & ERP'],
 };
 
 // each settlement's signature accent (portal/label/legend), so the legend dot, the
 // city beacon and the field notes all speak the same colour language.
 export const CITY_ACCENT = {
-  apairo: '#dda42a', toaster: '#e10600', splasher: '#00d8ff', about: '#c4763a',
+  apairo: '#dda42a', toaster: '#e10600', splasher: '#00d8ff', projector: '#d4af37', about: '#c4763a',
+  rubicon: '#a56cc1',
 };
 
 export const POIS = {
@@ -90,11 +93,11 @@ export const POIS = {
       body: 'Research intern on LiDAR-IMU SLAM. Built a Python framework to unify heterogeneous robotics datasets — the seed that became Apairo.',
     },
     rubicon: (l) => l === 'fr' ? {
-      kicker: 'Expérience · 2025', title: 'Rubicon · Bangkok',
-      body: "Stage ingénieur logiciel : migration complète de l'ERP vers Odoo 18 pour ~40 employés, 10+ modules sur-mesure et imports de données automatisés.",
+      kicker: 'Expérience · 2025–26', title: 'Rubicon · Bangkok',
+      body: "Stage ingénieur logiciel, seul sur le projet : migration complète de l'ERP vers Odoo 18 pour un fabricant de bijoux (~40 employés) — 25 modules sur-mesure et un pipeline d'import automatisé depuis l'ancien système. Sa propre ville sur la carte →",
     } : {
-      kicker: 'Experience · 2025', title: 'Rubicon · Bangkok',
-      body: 'Software engineering intern: full ERP migration to Odoo 18 for ~40 staff, 10+ custom modules and automated data-import pipelines.',
+      kicker: 'Experience · 2025–26', title: 'Rubicon · Bangkok',
+      body: 'Software engineering intern, solo on the project: full ERP migration to Odoo 18 for a jewelry manufacturer (~40 staff) — 25 custom modules and an automated import pipeline from the old legacy system. Has its own city on the map →',
     },
     contact: (l) => l === 'fr' ? {
       kicker: 'Dire bonjour', title: 'Augustin Bresset',
@@ -233,6 +236,78 @@ export const POIS = {
       body: "The flagship task: mark cell by cell what's drivable on the bird's-eye grid — the precision an autonomous robot needs to move.",
       meta: [['Stack', 'Python · Three.js · FastAPI']],
       links: [['Demo ↗', 'https://huggingface.co/spaces/SmaugC137/splasher'], ['GitHub ↗', 'https://github.com/augustin-bresset/splasher']],
+    },
+  },
+
+  projector: {
+    marquee: (l) => l === 'fr' ? {
+      kicker: 'Viewer · Multi-capteurs', title: 'Projector',
+      body: "Rejoue des séquences robotiques synchronisées, image par image : on scrute la timeline, on dispose les vues en mosaïque, et chaque capteur défile à son propre rythme.",
+      links: [['Démo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
+    } : {
+      kicker: 'Viewer · Multi-sensor', title: 'Projector',
+      body: 'Replays synchronized robotics sequences, frame by frame: scrub the timeline, dock views into a mosaic, and each sensor plays at its own native rate.',
+      links: [['Demo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
+    },
+    screens: (l) => l === 'fr' ? {
+      kicker: 'Vues parallèles', title: 'La Triple Séance',
+      body: "Trois écrans, un seul capteur ou plusieurs : nuage 3D, caméra 2D, vue du ciel BEV — réglages d'affichage réglés en direct, jamais un aller-retour serveur pendant la lecture.",
+    } : {
+      kicker: 'Parallel views', title: 'The Triple Bill',
+      body: 'Three screens, any channel: 3D cloud, 2D camera, top-down BEV — display settings tuned live, never a server round-trip during playback.',
+    },
+    booth: (l) => l === 'fr' ? {
+      kicker: 'La séance critique', title: 'Le Guichet des Confusions',
+      body: "Deux étiquetages, une bobine verte et une rouge : vrai/faux positifs et négatifs colorent chaque point, précision/rappel/IoU recalculés en direct — ne garder que le rouge ne montre que les erreurs du modèle.",
+      meta: [['Stack', 'Python · NumPy · FastAPI · Three.js']],
+    } : {
+      kicker: "The critics' screening", title: 'The Confusion Booth',
+      body: 'Two labelings, one green reel and one red: true/false positives and negatives colour every point, precision/recall/IoU recomputed live — keep only red and just the mistakes remain.',
+      meta: [['Stack', 'Python · NumPy · FastAPI · Three.js']],
+    },
+    lights: (l) => l === 'fr' ? {
+      kicker: 'Caméra', title: 'Projecteurs de Poursuite',
+      body: "La caméra peut suivre le robot comme un projecteur suit une vedette — orbite libre, mode poursuite verrouillé en translation, ou vue du ciel centrée sur l'ego, trajectoire en surimpression.",
+    } : {
+      kicker: 'Camera', title: 'Follow Spots',
+      body: 'The camera can track the robot like a spotlight follows a star — free orbit, translation-locked follow, or a BEV-follow view centred on ego, trajectory overlaid.',
+    },
+  },
+
+  rubicon: {
+    tower: (l) => l === 'fr' ? {
+      kicker: 'Stage solo · Bangkok, 2025–26', title: 'Rubicon',
+      body: "Une manufacture de bijoux thaïlandaise (~40 salariés), qui vend à travers les grands salons professionnels internationaux. Envoyé seul pour toute la mission : migrer l'ERP historique — un système MS-SQL maison baptisé JMS — vers Odoo 18, sans jamais arrêter la production.",
+      meta: [['Rôle', 'Ingénieur logiciel — seul du début à la fin'], ['Durée', '13 mois, toujours actif']],
+    } : {
+      kicker: 'Solo internship · Bangkok, 2025–26', title: 'Rubicon',
+      body: 'A Thai jewelry manufacturer (~40 staff) selling through major international trade fairs. Sent alone for the whole mission: migrate their legacy ERP — an in-house MS-SQL system called JMS — to Odoo 18, without ever stopping production.',
+      meta: [['Role', 'Software engineer — solo start to finish'], ['Duration', '13 months, still active']],
+    },
+    atelier: (l) => l === 'fr' ? {
+      kicker: 'PDP · Développement Produit', title: "L'Atelier",
+      body: "Le module qui pense un bijou avant qu'il existe : catalogue de pierres, cours du jour des métaux, coûts de façon, moteur de calcul de prix, gestion des modèles et variantes — jusqu'à un éditeur maison pour dessiner un nouveau modèle.",
+      meta: [['Échelle', '14 558 pierres · 48 699 produits · 13 056 modèles']],
+    } : {
+      kicker: 'PDP · Product Development', title: 'The Atelier',
+      body: 'The module that thinks up a piece of jewelry before it exists: a stone catalog, daily metal market prices, labor costing, a price-computation engine, model & variant management — down to a custom in-house editor for designing new models.',
+      meta: [['Scale', '14,558 stones · 48,699 products · 13,056 models']],
+    },
+    ledger: (l) => l === 'fr' ? {
+      kicker: 'SIS · Ventes', title: 'Le Comptoir',
+      body: "Devis, commandes, factures, clients et fournisseurs — et une analyse croisée dynamique des ventes par salon, région et pays, exportable en un clic vers Excel.",
+      meta: [['Échelle', '247 893 compositions pierre-produit importées']],
+    } : {
+      kicker: 'SIS · Sales', title: 'The Trading Post',
+      body: 'Quotations, orders, invoices, clients and vendors — plus a pivot sales-analysis tool sliced by trade fair, region and country, one click from an Excel export.',
+      meta: [['Scale', '247,893 stone-to-product compositions imported']],
+    },
+    roots: (l) => l === 'fr' ? {
+      kicker: 'Migration · Sous le parvis', title: 'Les Racines',
+      body: "Sous le parvis envahi de lianes dort encore JMS, le vieux système maison en MS-SQL. Un pipeline d'import a fait remonter chaque table vers Odoo — jusqu'aux 3,3 Go de photos produit — sans jamais interrompre la production.",
+    } : {
+      kicker: 'Migration · Beneath the forecourt', title: 'The Roots',
+      body: 'Below the vine-choked forecourt, JMS still sleeps — the old in-house MS-SQL system. An import pipeline pulled every table up into Odoo, down to 3.3GB of product photos, without ever stopping production.',
     },
   },
 };

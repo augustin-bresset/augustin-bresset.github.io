@@ -59,12 +59,26 @@ export class CameraRig {
 
   // Cinematic move to a goal over `dur` seconds (eased). Disables input meanwhile.
   // goal.fov (optional) tweens the camera field-of-view alongside position.
+  //
+  // this._azim is an UNBOUNDED angle (idle drift and free-orbit dragging both keep
+  // adding to it forever, so after a while it can sit at e.g. 15.7 rad instead of a
+  // tidy 0..2π value). Naively lerping straight to goal.azimuth's raw value can
+  // therefore sweep several extra full turns — the camera visibly "tours" all the
+  // way around the settlement before a portal dive instead of swinging the short
+  // way to face it. Fix: retarget goal.azimuth to the nearest angle to this._azim
+  // (same direction mod 2π, shortest delta), so the tween always takes the short arc.
   focusOn(goal, dur = 1.3) {
+    let toAzim = this._azim;
+    if (goal.azimuth !== undefined) {
+      const delta = goal.azimuth - this._azim;
+      const wrapped = ((delta + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      toAzim = this._azim + wrapped;   // shortest path, never more than half a turn
+    }
     this.tween = {
       t: 0, dur,
       from: { azim: this._azim, pol: this._pol, rad: this._rad, tgt: this._tgt.clone(), fov: this._fov },
       to: {
-        azim: goal.azimuth ?? this._azim,
+        azim: toAzim,
         pol: goal.polar ?? this._pol,
         rad: goal.radius ?? this._rad,
         tgt: goal.target ? goal.target.clone() : this._tgt.clone(),

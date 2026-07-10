@@ -90,6 +90,22 @@ function boot() {
     onLang.forEach((f) => f());
   });
 
+  // "How it works" popup (common to every world): the "?" button reopens it any
+  // time; shown once automatically on a visitor's first-ever visit.
+  if (ui.helpBtn) ui.helpBtn.addEventListener('click', () => ui.showHelp());
+  if (ui.helpGotIt) ui.helpGotIt.addEventListener('click', () => ui.hideHelp());
+  if (ui.helpModal) {
+    ui.helpModal.addEventListener('click', (e) => { if (e.target === ui.helpModal) ui.hideHelp(); });
+    document.getElementById('help-close').addEventListener('click', () => ui.hideHelp());
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ui.hideHelp(); });
+  try {
+    if (!localStorage.getItem('seenHelp')) {
+      localStorage.setItem('seenHelp', '1');
+      setTimeout(() => ui.showHelp(), 800);
+    }
+  } catch (e) { /* storage disabled (private mode) — just skip the auto-popup */ }
+
   // ===================== CROQUIS: the endless fly-through drawing =====================
   if (world.croquis) {
     const croquis = buildCroquis(stage, container, seed);

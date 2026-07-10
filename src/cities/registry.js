@@ -5,7 +5,9 @@
 import { build as buildApairo } from './apairo.js';
 import { build as buildToaster } from './toaster.js';
 import { build as buildSplasher } from './splasher.js';
+import { build as buildProjector } from './projector.js';
 import { build as buildAbout } from './about.js';
+import { build as buildRubicon } from './rubicon.js';
 
 export const CITIES = [
   {
@@ -26,9 +28,22 @@ export const CITIES = [
     affinity: ['marsh', 'beach', 'plains'],
   },
   {
+    // Hollywood Art Deco premiere — a viewer that replays what toaster/splasher
+    // label, so it wants to sit near its siblings. Glamorous hillside town →
+    // Hollywood-hills terrain, dry and breezy.
+    id: 'projector', build: buildProjector, radius: 54,
+    affinity: { hills: 1.0, plains: 0.55, savanna: 0.35 },
+  },
+  {
     // Augustin's wind-inventor town (l'Arbre de Transmission) → high, breezy ground
     id: 'about', build: buildAbout, radius: 48,
     affinity: ['hills', 'mountain', 'forest'],
+  },
+  {
+    // Rubicon: a Bangkok jewelry manufacturer's office, reclaimed by a strangler
+    // fig — the solo ERP-migration internship → humid tropical canopy
+    id: 'rubicon', build: buildRubicon, radius: 38,
+    affinity: { forest: 1.0, marsh: 0.4, plains: 0.25 },
   },
 ];
 
@@ -42,11 +57,14 @@ export const LINKS = {
   [linkKey('toaster', 'splasher')]: 165,
   [linkKey('apairo', 'toaster')]: 320,
   [linkKey('apairo', 'splasher')]: 340,
+  [linkKey('toaster', 'projector')]: 190,
+  [linkKey('splasher', 'projector')]: 190,
+  [linkKey('apairo', 'projector')]: 360,
 };
 export const LINK_FAR = 460;
 
 // placement order: tightly-linked projects first so the rest arrange around them
-export const PLACE_ORDER = ['toaster', 'splasher', 'apairo', 'about'];
+export const PLACE_ORDER = ['toaster', 'splasher', 'projector', 'apairo', 'about', 'rubicon'];
 
 export function desiredDist(a, b) {
   if (a === b) return 0;

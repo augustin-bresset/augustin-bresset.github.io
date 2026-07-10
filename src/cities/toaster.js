@@ -122,22 +122,23 @@ export function build() {
   sweep.material.transparent = true; sweep.material.opacity = 0.1;
   sweep.position.set(23, 0, 0); sweep.rotation.y = Math.PI / 2;
   sweepPivot.add(sweep);
-  // the two toast slabs, as before — but the -z one stays popped and carries THE
-  // PORTAL: a window cut straight into the slice. Just the two rectangles.
+  // the two toast slabs — both pop on the same heartbeat now. The -z one carries
+  // THE PORTAL, cut straight into the slice, parented to it so the window pops
+  // up and down with its toast instead of sitting frozen mid-air.
   const toasts = [];
   {
     const tst = box(5.6, 5, 0.7, TOAST, { pos: [0, 23.6, 1.0], emissive: 0x3a2a10, emissiveIntensity: 0.5 });
     hero.add(tst); toasts.push(tst);
   }
   const portalSlab = box(5.6, 5, 0.7, TOAST, { pos: [0, 23.9, -1.0], emissive: 0x3a2a10, emissiveIntensity: 0.5 });
-  hero.add(portalSlab);
+  hero.add(portalSlab); toasts.push(portalSlab);
   for (const dz of [-1.0, 1.0]) {
     hero.add(box(6.0, 0.3, 0.9, RED, { pos: [0, 21.7, dz], emissive: RED, emissiveIntensity: 1.6, cast: false }));
   }
   const portal = makeWallPortal('#e10600', 5.0, 4.2);
-  portal.group.position.set(0, 21.6, -1.36);
+  portal.group.position.set(0, -2.3, -0.36);    // local to portalSlab (was world 0,21.6,-1.36)
   portal.group.rotation.y = Math.PI;            // the window faces OUT, away from the drum
-  hero.add(portal.group);
+  portalSlab.add(portal.group);
   // heating strips around the base + red gauge up the mast + rooftop beacon
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + Math.PI / 4;

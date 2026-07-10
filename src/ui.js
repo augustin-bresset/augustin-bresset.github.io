@@ -13,6 +13,11 @@ export class UI {
     this.themeBtn = document.getElementById('theme-btn');
     this.hint = document.getElementById('hint');
     this.legend = document.getElementById('legend');
+    this.helpBtn = document.getElementById('help-btn');
+    this.helpModal = document.getElementById('help-modal');
+    this.helpTitle = document.getElementById('help-title');
+    this.helpList = document.getElementById('help-list');
+    this.helpGotIt = document.getElementById('help-gotit');
     this.activeNote = null;     // { cityId, poiId, accent }
     this._hintKey = 'hint';
     this._legendCities = null;
@@ -85,6 +90,14 @@ export class UI {
     this.backBtn.style.display = visible ? 'flex' : 'none';
   }
 
+  showHelp() {
+    if (this.helpModal) this.helpModal.classList.remove('hidden');
+  }
+
+  hideHelp() {
+    if (this.helpModal) this.helpModal.classList.add('hidden');
+  }
+
   // show the hint line with a specific string key (overview vs in-city guidance)
   showHint(key) {
     this._hintKey = key;
@@ -108,5 +121,12 @@ export class UI {
       this.cardBody.innerHTML = renderNote(this.activeNote.cityId, this.activeNote.poiId, LANG.current);
     }
     this.renderLegend();
+    if (this.helpTitle) this.helpTitle.textContent = LANG.t('helpTitle');
+    if (this.helpGotIt) this.helpGotIt.textContent = LANG.t('helpGotIt');
+    if (this.helpBtn) this.helpBtn.title = LANG.t('helpTitle');
+    if (this.helpList) {
+      const items = LANG.t('helpItems');
+      this.helpList.innerHTML = Array.isArray(items) ? items.map((i) => `<li>${i}</li>`).join('') : '';
+    }
   }
 }

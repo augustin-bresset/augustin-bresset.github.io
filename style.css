@@ -139,6 +139,14 @@ html, body {
   padding: 0.45rem 0.8rem;
 }
 
+.ui-btn--help {
+  margin-left: 0;
+  font-family: 'EB Garamond', serif;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.45rem 0.85rem;
+}
+
 /* ── Sketch / croquis theme: heavier paper tooth + graphite grain, lighter
    vignette so the page reads like a pencil sketchbook leaf. ─────────────── */
 body.theme-sketch #paper { opacity: 0.82; background-size: 430px 430px; }
@@ -347,6 +355,64 @@ body.theme-sketch #vignette {
   transition: color 0.2s;
 }
 .note-link:hover { color: var(--accent); }
+
+/* ── How-it-works popup (centred, dimmed backdrop) ────────────── */
+.help-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 14, 8, 0.45);
+  backdrop-filter: blur(2px);
+}
+.help-modal.hidden { display: none; }
+
+.help-card {
+  position: relative;
+  width: min(420px, calc(100vw - 40px));
+  background:
+    linear-gradient(170deg, rgba(255, 253, 246, 0.7), rgba(237, 228, 210, 0) 130px),
+    var(--parchment);
+  border: 2px solid var(--ink);
+  padding: 1.6rem 1.8rem 1.7rem;
+  box-shadow: 8px 10px 0 rgba(44, 26, 14, 0.2);
+  animation: noteDrop 0.32s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+.help-title {
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: 1.7rem;
+  color: var(--ink);
+  margin: 0 0 0.9rem;
+  padding-right: 1.2rem;
+}
+
+.help-list {
+  margin: 0 0 1.3rem;
+  padding-left: 1.15rem;
+  font-family: 'EB Garamond', serif;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink-mid);
+}
+.help-list li { margin-bottom: 0.55rem; }
+.help-list li:last-child { margin-bottom: 0; }
+
+.help-gotit {
+  display: block;
+  margin: 0 auto;
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-card { animation: none !important; }
+}
 
 /* entrance: the slip drops in, its lines rise in a quick stagger */
 @keyframes noteDrop {
