@@ -31,7 +31,12 @@ const WOOD1 = 0xcdae82, WOOD2 = 0xb8966a, CANVAS = 0xece4d2, ROPE = 0x5b5348;
 
 // ---- flight / field tuning ----
 const SPEED = 30;              // forward cruise (u/s) — a gentle soaring glide
-const SPAWN = 850;             // spawn distance ahead (past fogFar → fades in)
+const SPAWN = 1180;            // spawn distance ahead (past fogFar → fades in)
+// Ships get their OWN, much shorter recycle distance: scaling their spawn point
+// with the wide-visibility SPAWN above made every airship take ~40s of flight to
+// reach after respawning ("j'en trouve jamais de généré") — clouds can be distant
+// scenery, but a craft you're meant to actually meet needs to stay close.
+const SHIP_SPAWN = 460;
 const BEHIND = 150;            // recycle once this far behind the camera
 const CORRIDOR_Y = [-260, 320];
 
@@ -45,7 +50,7 @@ export function buildCroquis(stage, container, seed) {
 
   // ---- warm the paper ambiance for flight (mutate the live stage, never rebuild) ----
   stage.scene.background = bakeSky();
-  if (stage.scene.fog) { stage.scene.fog.color.set(FOG); stage.scene.fog.near = 120; stage.scene.fog.far = 900; }
+  if (stage.scene.fog) { stage.scene.fog.color.set(FOG); stage.scene.fog.near = 170; stage.scene.fog.far = 1250; }
   if (stage.sun) stage.sun.castShadow = false;
   stage.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 
@@ -170,7 +175,7 @@ export function buildCroquis(stage, container, seed) {
   // balloon wears its project's identity in pale pastel: the toast balloon (warm red
   // band, a toast slab swinging under the basket), the splash droplet (cyan, teardrop
   // envelope), the inventor's patchwork (warm amber, a wooden gear hanging).
-  const BALLOON_THEMES = ['toast', 'splash', 'apairo'];
+  const BALLOON_THEMES = ['toast', 'splash', 'apairo', 'projector', 'rubicon'];
   const balloons = [];                 // exposed for click-picking (project cards)
   BALLOON_THEMES.forEach((theme, i) => {
     const brng = mulberry32((seed ^ (0xba1100 * (i + 1))) >>> 0);
@@ -280,6 +285,17 @@ export function buildCroquis(stage, container, seed) {
 
   return {
     group, camera, isCroquis: true, balloons,
+    // Called from a UI button: instead of waiting on natural recycling, pull
+    // EVERY ship (dirigibles, sky-boats, skiffs, project balloons, the B-612)
+    // into a tight cluster right ahead of the camera — a guaranteed "wave" of
+    // aircraft, on demand. Uses the current _fwd/_right/_u basis (updated every
+    // frame in update(), so valid the instant this is called mid-flight).
+    spawnWave() {
+      for (const sh of ships) {
+        scatter(sh.base, pos, 70, 90, 60, [-20, 70]);
+        sh.group.position.copy(sh.base);
+      }
+    },
     update(t, dt) {
       // ---------- origin rebase FIRST (infinite-flight precision): shift the whole
       // pool + pos before the camera/ships are placed from them this frame, so camera
@@ -352,8 +368,10 @@ export function buildCroquis(stage, container, seed) {
         const along = _d.dot(_fwd);
         if (along < -BEHIND * 1.6 || _d.lengthSq() > dist2sq) {
           // balloons respawn close to the flight corridor so you actually MEET them;
-          // other ships (and the B-612) keep their wide, rarer bands.
-          scatter(sh.base, camPos, SPAWN - 30, 130, sh.balloon ? 150 : 420,
+          // other ships (and the B-612) keep their wide, rarer bands — but still on
+          // SHIP_SPAWN, not the far-visibility SPAWN, so "rare" means off to the
+          // side, not "effectively never happens".
+          scatter(sh.base, camPos, SHIP_SPAWN - 30, 130, sh.balloon ? 150 : 420,
             sh.rare ? [-40, 120] : sh.balloon ? [-20, 150] : [-220, 260]);
         }
         sh.group.position.copy(sh.base);
@@ -541,12 +559,26 @@ const CRAFT_VARIANTS = {
   gear: [    // Origin: the inventor's wood-and-canvas craft (currently not flown)
     { env: 0xe9dcc2, band: 0xd4b78a, band2: null,     charm: 'gear', charmCol: 0xb8966a },
   ],
+  projector: [  // Projector: the Art Deco premiere — champagne envelope, onyx or gold band
+    { env: 0xece0c4, band: 0xd4af37, band2: null,     charm: 'reel', charmCol: 0x2a2430 },
+    { env: 0xe4d6ae, band: 0x2a2430, band2: 0xd4af37, charm: 'reel', charmCol: 0xd4af37 },
+  ],
+  rubicon: [  // Rubicon: jungle-reclaimed jewelry ERP — amethyst band, gem charm
+    { env: 0xdce8d2, band: 0xa56cc1, band2: null,     charm: 'gem', charmCol: 0xb3243c },
+    { env: 0xe6dcc8, band: 0x5a8a4c, band2: 0xa56cc1, charm: 'gem', charmCol: 0x2e9e5b },
+  ],
 };
 
 function makeCraft(rng, project) {
   const variants = CRAFT_VARIANTS[project] || CRAFT_VARIANTS.toast;
   const V = variants[(rng() * variants.length) | 0];
-  const dirigible = rng() < 0.5;
+  // Projector always flies its own dedicated searchlight blimp (moved here from
+  // the city itself, which no longer has one) — no montgolfière roll for it.
+  if (project === 'projector') return makeProjectorAirship(rng, V);
+  // dirigibles now carry real per-project silhouette detail (see
+  // makeDirigibleCraft's per-charm block below), not just a recoloured hull —
+  // so they're the common case; the plain montgolfière is the rare change-up.
+  const dirigible = rng() < 0.85;
   return dirigible ? makeDirigibleCraft(rng, V) : makeBalloonCraft(rng, V);
 }
 
@@ -575,6 +607,19 @@ function makeCharm(rng, V, g, y) {
     tip.position.y = 4.8; charm.add(tip);
     g.add(charm);
     charm.userData.eye = eye;
+  } else if (V.charm === 'reel') {
+    // a little film reel — Projector's charm
+    charm = new THREE.Group();
+    charm.add(new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.42, 6, 14), mat));
+    charm.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.5, 8), mat));
+    for (let s = 0; s < 5; s++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.2, 0.5), mat);
+      spoke.rotation.z = (s / 5) * Math.PI * 2; charm.add(spoke);
+    }
+    g.add(charm);
+  } else if (V.charm === 'gem') {
+    // a hand-cut gem — Rubicon's charm
+    charm = outlined(new THREE.OctahedronGeometry(2.6, 0), mat, 0.35, (rng() * 1e9) | 0, g);
   } else {
     charm = new THREE.Group();
     charm.add(new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.7, 6, 8), mat));
@@ -653,6 +698,53 @@ function makeBalloonCraft(rng, V) {
   return { group: g, anim };
 }
 
+// Projector's dedicated craft — a faithful (smaller) recreation of the Art Deco
+// searchlight blimp that used to patrol above the actual Projector city (moved
+// here instead, at Augustin's request: "reprend le dirigeable... et retire-le
+// de la ville"). Twin gimballed searchlights swing beneath it, same additive-
+// cone technique as the palace's own ground kliegs, just narrower and smaller.
+function makeProjectorAirship(rng, V) {
+  const g = new THREE.Group();
+  const hull = new THREE.MeshLambertMaterial({ color: V.env, flatShading: true });
+  const gold = new THREE.MeshLambertMaterial({ color: V.band, flatShading: true });
+  const envelope = new THREE.SphereGeometry(1, 16, 10); envelope.scale(24, 8.6, 8.6);
+  outlined(envelope, hull, 0.5, (rng() * 1e9) | 0, g);
+  const stripe = new THREE.Mesh(new THREE.TorusGeometry(8.4, 0.45, 6, 24),
+    new THREE.MeshBasicMaterial({ color: V.band }));
+  stripe.rotation.y = Math.PI / 2; stripe.scale.z = 2.7; g.add(stripe);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(3.2, 7.5, 8), hull);
+  nose.rotation.z = -Math.PI / 2; nose.position.x = 23; g.add(nose);
+  for (const dz of [-4.2, 4.2]) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(6.4, 5.8, 0.5), gold);
+    fin.position.set(-19.5, 0.6, dz); fin.rotation.y = dz > 0 ? -0.35 : 0.35; g.add(fin);
+  }
+  const gondola = new THREE.Mesh(new THREE.BoxGeometry(7, 2.6, 3),
+    new THREE.MeshLambertMaterial({ color: 0x171420, flatShading: true }));
+  gondola.position.y = -9.4; g.add(gondola);
+
+  const beamH = 60;
+  const spots = [];
+  for (const dz of [-2.2, 2.2]) {
+    const piv = new THREE.Group(); piv.position.set(0, -1.4, dz); gondola.add(piv);
+    const cone = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 5.8, beamH, 10, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xf6dd8c, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    cone.position.y = -beamH / 2; piv.add(cone);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, beamH, 6),
+      new THREE.MeshBasicMaterial({ color: 0xfff6df, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+    core.position.y = -beamH / 2; piv.add(core);
+    spots.push({ piv, ph: dz > 0 ? 0 : Math.PI });
+  }
+  const charm = makeCharm(rng, V, g, -13);
+  const ph = rng() * 9;
+  const anim = (t) => {
+    for (const s of spots) s.piv.rotation.z = Math.sin(t * 0.7 + s.ph + ph) * 0.35;
+    animCharm(charm, t, -13);
+  };
+  g.scale.setScalar(0.9 + rng() * 0.3);
+  return { group: g, anim };
+}
+
 function makeDirigibleCraft(rng, V) {
   const g = new THREE.Group();
   const wood = new THREE.MeshLambertMaterial({ color: WOOD2, flatShading: true });
@@ -672,6 +764,43 @@ function makeDirigibleCraft(rng, V) {
     new THREE.Vector3(-5, -11, 0), new THREE.Vector3(-8, -3, 0),
     new THREE.Vector3(5, -11, 0), new THREE.Vector3(8, -3, 0),
   ]), new THREE.LineBasicMaterial({ color: ROPE })));
+
+  // ---- per-project silhouette detail, keyed off V.charm — a dirigible should
+  // read as ITS project at a glance, not just a hull with a different band ----
+  if (V.charm === 'toast') {
+    // Toaster: a chrome sensor nose + a thin red scan-slit down the hull
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(6, 7, 10),
+      new THREE.MeshLambertMaterial({ color: 0xb8c0c8, flatShading: true }));
+    nose.rotation.z = -Math.PI / 2; nose.position.x = 29; g.add(nose);
+    const slit = new THREE.Mesh(new THREE.BoxGeometry(44, 0.6, 1.3), new THREE.MeshBasicMaterial({ color: 0xe10600 }));
+    slit.position.y = 9.6; g.add(slit);
+  } else if (V.charm === 'drop') {
+    // Splasher: a slim cyan sensor mast on top, echoing the city's LiDAR mast
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 6, 6), wood);
+    mast.position.y = 11.5; g.add(mast);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(1.4, 8, 6),
+      new THREE.MeshLambertMaterial({ color: 0x57e8ff, flatShading: true, transparent: true, opacity: 0.85 }));
+    head.position.y = 14.6; g.add(head);
+  } else if (V.charm === 'robot') {
+    // Apairo: twin antenna prongs — the "reference clock" towers, in miniature
+    for (const dx of [-4, 4]) {
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 7, 6), wood);
+      mast.position.set(dx, 11.5, 0); g.add(mast);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 5), new THREE.MeshBasicMaterial({ color: 0xd9a441 }));
+      tip.position.set(dx, 15, 0); g.add(tip);
+    }
+  } else if (V.charm === 'gem') {
+    // Rubicon: trailing vine tendrils off the rigging, jungle-green
+    for (const dz of [-2.5, 2.5]) {
+      const vine = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 6, 5),
+        new THREE.MeshLambertMaterial({ color: 0x6f9457, flatShading: true }));
+      vine.position.set(0, -16, dz); g.add(vine);
+      const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0),
+        new THREE.MeshLambertMaterial({ color: 0x7ba854, flatShading: true }));
+      leaf.position.set(dz > 0 ? 0.7 : -0.7, -19, dz); g.add(leaf);
+    }
+  }
+
   // stern propeller: a great wooden GEAR for the inventor, plain blades otherwise
   const prop = new THREE.Group(); prop.position.set(-28, 0, 0); g.add(prop);
   if (V.charm === 'gear') {

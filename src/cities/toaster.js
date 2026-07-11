@@ -193,7 +193,7 @@ export function build() {
     const b = poiBeacon(accent); b.group.position.set(x, y, z); g.add(b.group);
     tagPOI(b.group, id); pois.push({ id, accent, beacon: b });
   };
-  addBeacon('stage', '#33d6ff', 0, 36, 0);
+  addBeacon('stage', '#33d6ff', 0, 4, 0);
   addBeacon('clustering', '#e10600', Math.cos(SEC_W) * 10, 22, Math.sin(SEC_W) * 10);
   addBeacon('landmark', '#ff8a3c', voxelPos.x, 8, voxelPos.z);
 

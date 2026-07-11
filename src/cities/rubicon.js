@@ -50,12 +50,15 @@ function leafBlob(x, y, z, r, color) {
   return m;
 }
 
-// a hanging vine (pivot at top, sways in update()) with a couple of leaf tufts
+// a hanging vine/liana (pivot at top, sways in update()). Thick enough and long
+// enough to read as a real cable at diorama viewing distance — a thin 0.1-radius
+// stick was getting lost against the leaf-blob window overgrowth, so this is
+// deliberately heavier: a tapered rope with three leaf tufts strung along it.
 function makeVine(parent, x, y, z, len, vines) {
   const piv = new THREE.Group(); piv.position.set(x, y, z); parent.add(piv);
-  piv.add(cyl(0.08, 0.14, len, MOSS, 5, { pos: [0, -len / 2, 0], cast: false, receive: false }));
-  for (const fy of [len * 0.35, len * 0.75]) {
-    piv.add(leafBlob(0.28 * (Math.random() > 0.5 ? 1 : -1), -fy, 0, 0.5, LEAF_C));
+  piv.add(cyl(0.16, 0.24, len, MOSS, 5, { pos: [0, -len / 2, 0], cast: false, receive: false }));
+  for (const fy of [len * 0.25, len * 0.55, len * 0.85]) {
+    piv.add(leafBlob(0.4 * (Math.random() > 0.5 ? 1 : -1), -fy, 0, 0.6 + Math.random() * 0.25, LEAF_C));
   }
   vines.push({ piv, ph: Math.random() * Math.PI * 2 });
 }
@@ -116,9 +119,10 @@ function buildTower(w, d, floors, floorH, seed, vines, opts = {}) {
   g.add(cyl(1.0, 1.1, 1.6, 0x8a8368, 10, { pos: [-w * 0.28, h + 1.3, d * 0.18], roughness: 0.8 }));
   g.add(leafBlob(w * 0.22, h + 1.4, -d * 0.15, 1.8, LEAF_A));
   g.add(leafBlob(-w * 0.1, h + 2.0, d * 0.05, 1.3, LEAF_C));
-  // roof-edge vines cascading down the front + side faces
-  for (const fx of [-w * 0.32, 0, w * 0.3]) makeVine(g, fx, h, d / 2 + 0.05, 3.5 + Math.random() * 4, vines);
-  for (const fz of [-d * 0.2, d * 0.25]) makeVine(g, w / 2 + 0.05, h, fz, 3 + Math.random() * 3.5, vines);
+  // roof-edge vines cascading down the front + side faces — long enough to drape
+  // past a couple of floors, so they read at a glance, not just up close
+  for (const fx of [-w * 0.32, 0, w * 0.3]) makeVine(g, fx, h, d / 2 + 0.05, 7 + Math.random() * 6, vines);
+  for (const fz of [-d * 0.2, d * 0.25]) makeVine(g, w / 2 + 0.05, h, fz, 6 + Math.random() * 5, vines);
   // roots creeping up from the base at the corners
   for (const [sx, sz] of [[-1, 1], [1, 1]]) {
     g.add(limb(new THREE.Vector3(sx * (w / 2 + 0.3), 0, sz * (d / 2 + 0.3)),
@@ -214,6 +218,19 @@ export function build() {
   });
   const lantern = box(0.4, 0.5, 0.4, WARM, { pos: [1.3, 2.5, 1.2], emissive: WARM, emissiveIntensity: 1.3, cast: false });
   atelier.add(lantern);
+  // production-tracking corner, on the table's free edge (top at y=0.7): not a
+  // design-invention tool — a barcode scanner and a digital scale, the other half
+  // of what PDP actually does (checking, not conjuring)
+  atelier.add(box(0.4, 0.3, 0.28, 0x2a2a30, { pos: [0.82, 0.85, 1.85], roughness: 0.5, metalness: 0.3 }));
+  const scanLine = box(0.32, 0.03, 0.03, 0xff4444, {
+    pos: [0.82, 0.71, 1.68], emissive: 0xff4444, emissiveIntensity: 1.6, cast: false, receive: false,
+  });
+  atelier.add(scanLine);
+  atelier.add(cyl(0.26, 0.28, 0.08, 0x8a8a90, 10, { pos: [0.82, 0.74, 2.25], roughness: 0.4, metalness: 0.5 }));
+  const scaleDisplay = box(0.26, 0.12, 0.04, 0x1a2a1a, {
+    pos: [0.82, 0.92, 2.4], emissive: 0x4fef6a, emissiveIntensity: 1.2, cast: false, receive: false,
+  });
+  atelier.add(scaleDisplay);
   tagPOI(atelier, 'atelier');
   addBeacon('atelier', '#a56cc1', atelierPos.x, 5.5, atelierPos.z);
 
@@ -244,6 +261,37 @@ export function build() {
   }
   tagPOI(ledger, 'ledger');
   addBeacon('ledger', '#a56cc1', ledgerPos.x, 5.5, ledgerPos.z);
+
+  // ===== THE CARGO DIRIGIBLE — canvas-and-rattan airship shuttling crates out to
+  // the next trade fair, looping out from the Ledger and back: the SIS shipping
+  // line made literal. Vines trail off its rigging, same as the towers.
+  const airship = new THREE.Group(); g.add(airship);
+  const aEnv = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10),
+    new THREE.MeshStandardMaterial({ color: THATCH, flatShading: true, roughness: 0.95 }));
+  aEnv.scale.set(4.4, 1.6, 1.6); aEnv.castShadow = true; airship.add(aEnv);
+  const aBand = new THREE.Mesh(new THREE.TorusGeometry(1.58, 0.08, 6, 16),
+    new THREE.MeshStandardMaterial({ color: WOOD, flatShading: true, roughness: 0.9 }));
+  aBand.rotation.y = Math.PI / 2; aBand.scale.set(1, 1, 2.5); airship.add(aBand);
+  for (const dz of [-0.7, 0.7]) {
+    const fin = box(1.0, 0.9, 0.08, WOOD, { pos: [-3.85, 0.1, dz], roughness: 0.85, cast: false });
+    fin.rotation.y = dz > 0 ? -0.4 : 0.4; airship.add(fin);
+  }
+  // rigging down to a small crate-laden platform — the cargo, stamped in gem colors.
+  // Thick enough to actually read as rope (0.025 all but vanished at this scale —
+  // the same mistake the tower vines had before they got fixed).
+  airship.add(box(1.8, 0.14, 1.0, WOOD, { pos: [0, -2.1, 0], roughness: 0.85 }));
+  for (const [rx, rz] of [[-0.75, -0.4], [0.75, -0.4], [-0.75, 0.4], [0.75, 0.4]]) {
+    airship.add(cyl(0.07, 0.07, 1.7, WOOD, 4, { pos: [rx, -1.25, rz], cast: false }));
+  }
+  [[-0.5, 0], [0.35, 0.05], [0.0, -0.05]].forEach(([cx, cz], i) => {
+    airship.add(box(0.55, 0.55, 0.55, i % 2 ? 0x8a6a44 : 0x9a7a52, { pos: [cx, -1.75, cz], roughness: 0.9 }));
+    airship.add(box(0.2, 0.2, 0.06, GEMS[i % GEMS.length], {
+      pos: [cx, -1.7, cz + (cz >= 0 ? 0.32 : -0.32)],
+      emissive: GEMS[i % GEMS.length], emissiveIntensity: 1.1, cast: false, receive: false,
+    }));
+  });
+  for (const dz of [-0.3, 0.3]) makeVine(airship, -0.9, -2.1, dz, 2.0 + Math.random(), vines);
+  const AIRSHIP_R = 18, AIRSHIP_Y = 27, AIRSHIP_SP = 0.05;
 
   // ===== THE ROOTS — the buried legacy system, still feeding the towers =========
   const ruinsPos = new THREE.Vector3(Math.cos(Math.PI * 1.25) * 11.5, 0, Math.sin(Math.PI * 1.25) * 11.5);
@@ -285,7 +333,7 @@ export function build() {
   const portal = makeWallPortal('#a56cc1', 5.0, 4.4);
   portal.group.position.set(0, 0, 5.5 / 2 + 0.1);
   annex.group.add(portal.group);
-  for (const dx of [-2.6, 2.6]) makeVine(annex.group, dx, 4.9, 5.5 / 2 + 0.05, 2.4 + Math.random(), vines);
+  for (const dx of [-2.6, 2.6]) makeVine(annex.group, dx, 4.9, 5.5 / 2 + 0.05, 3.6 + Math.random() * 1.4, vines);
 
   tagPickable(g, 'rubicon');
 
@@ -307,6 +355,9 @@ export function build() {
       // atelier: hand-cut gems turn slowly, lantern flickers warm
       gemMeshes.forEach((gm, i) => { gm.rotation.y = t * (0.6 + i * 0.1); });
       lantern.material.emissiveIntensity = 1.1 + Math.sin(t * 2.2) * 0.3;
+      // atelier: barcode scanner flickers each pass, scale readout breathes
+      scanLine.material.emissiveIntensity = 1.2 + Math.sin(t * 5) * 0.6;
+      scaleDisplay.material.emissiveIntensity = 0.9 + Math.sin(t * 1.6 + 1) * 0.5;
 
       // ledger: bunting sways, the pivot bars pulse per fair/region/country
       bunting.forEach((fl, i) => { fl.rotation.z = Math.sin(t * 1.4 + i * 0.6) * 0.25; });
@@ -327,6 +378,16 @@ export function build() {
       else pulse.position.lerpVectors(veinMid, veinTopWorld, (pf - 0.4) / 0.6);
       pulse.material.emissiveIntensity = 1.8 + Math.sin(t * 8) * 0.5;
       tablets.forEach((tb, i) => { tb.rotation.y = Math.sin(t * 0.2 + i) * 0.02; });
+
+      // the cargo dirigible loops out from the Ledger and back, banking gently
+      const aa = t * AIRSHIP_SP;
+      airship.position.set(
+        ledgerPos.x + Math.cos(aa) * AIRSHIP_R,
+        AIRSHIP_Y + Math.sin(t * 0.2) * 1.2,
+        ledgerPos.z + Math.sin(aa) * AIRSHIP_R,
+      );
+      airship.rotation.y = -aa + Math.PI / 2;
+      airship.rotation.z = Math.sin(t * 0.25) * 0.05;
     },
   };
 }

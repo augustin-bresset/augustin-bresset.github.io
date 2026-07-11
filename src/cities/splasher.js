@@ -180,7 +180,8 @@ export function build() {
   };
   addBeacon('table', '#5b9bff', 0, 12, 0);
   addBeacon('mast', '#57e8ff', mastPos.x, 15, mastPos.z);
-  addBeacon('towers', '#2ad4ff', camPos.x, 10, camPos.z);   // traversability corridor + cams
+  addBeacon('towers', '#2ad4ff', camPos.x, 20, camPos.z);   // traversability corridor + cams — raised
+  // clear of the surrounding BEV terrace columns, which were swallowing the gem
 
   // ===== portal in the pad's cleared corner =====================================
   // ===== THE END OF THE ROAD — the portal stands at the corridor's terminus: the

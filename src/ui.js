@@ -9,6 +9,7 @@ export class UI {
     this.card = document.getElementById('note-card');
     this.cardBody = document.getElementById('note-body');
     this.backBtn = document.getElementById('back-btn');
+    this.waveBtn = document.getElementById('wave-btn');
     this.langBtn = document.getElementById('lang-btn');
     this.themeBtn = document.getElementById('theme-btn');
     this.hint = document.getElementById('hint');
@@ -90,6 +91,10 @@ export class UI {
     this.backBtn.style.display = visible ? 'flex' : 'none';
   }
 
+  setWave(visible) {
+    if (this.waveBtn) this.waveBtn.style.display = visible ? 'flex' : 'none';
+  }
+
   showHelp() {
     if (this.helpModal) this.helpModal.classList.remove('hidden');
   }
@@ -115,6 +120,8 @@ export class UI {
     document.documentElement.lang = LANG.current;
     const backSpan = this.backBtn.querySelector('[data-key]');
     if (backSpan) backSpan.textContent = LANG.t('back');
+    const waveSpan = this.waveBtn && this.waveBtn.querySelector('[data-key]');
+    if (waveSpan) waveSpan.textContent = LANG.t('waveBtn');
     const hintSpan = this.hint && this.hint.querySelector('[data-key]');
     if (hintSpan) hintSpan.textContent = LANG.t(this._hintKey);
     if (this.activeNote) {

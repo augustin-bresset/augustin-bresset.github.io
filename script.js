@@ -114,13 +114,18 @@ function boot() {
     if (croquis.resize) window.addEventListener('resize', croquis.resize);
     ui.setLegend(false);
     ui.setBack(false);
+    ui.setWave(true);
     ui.showHint('croquisHint');
+    if (ui.waveBtn) ui.waveBtn.addEventListener('click', () => croquis.spawnWave());
 
     // ---- clickable project balloons: a short card with links, pinned to the craft.
     // Picking is a GENEROUS screen-space test, not a precise raycast: steering
     // follows the pointer, so the camera keeps turning while you aim — the craft
     // slides under the cursor and an exact mesh hit is nearly impossible to land.
-    const BALLOON_ACCENT = { toast: '#e10600', splash: '#3b82f6', apairo: '#dda42a', gear: '#c4763a' };
+    const BALLOON_ACCENT = {
+      toast: '#e10600', splash: '#3b82f6', apairo: '#dda42a', gear: '#c4763a',
+      projector: '#d4af37', rubicon: '#a56cc1',
+    };
     const v = new THREE.Vector3();
     let opened = null;                        // { group, theme } of the open card
     let down = null;

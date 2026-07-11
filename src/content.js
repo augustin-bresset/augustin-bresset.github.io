@@ -64,33 +64,84 @@ export const POIS = {
       body: 'The inventor behind it all — the path, the projects and the rest of the archipelago live on the map.',
       links: [['GitHub ↗', 'https://github.com/augustin-bresset']],
     },
+    projector: (l) => l === 'fr' ? {
+      kicker: 'Montgolfière · Projet', title: 'Projector',
+      body: "Rejoue des séquences robotiques synchronisées, capteur par capteur, en mosaïque d'écrans.",
+      links: [['Démo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
+    } : {
+      kicker: 'Balloon · Project', title: 'Projector',
+      body: 'Replays synchronized robotics sequences, sensor by sensor, in a mosaic of screens.',
+      links: [['Demo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
+    },
+    rubicon: (l) => l === 'fr' ? {
+      kicker: 'Montgolfière · Expérience', title: 'Rubicon',
+      body: "Stage solo à Bangkok : migration complète d'un ERP de bijouterie vers Odoo 18, 25 modules sur-mesure.",
+    } : {
+      kicker: 'Balloon · Experience', title: 'Rubicon',
+      body: 'A solo internship in Bangkok: a full jewelry-manufacturer ERP migration to Odoo 18, 25 custom modules.',
+    },
   },
 
   about: {
     polytechnique: (l) => l === 'fr' ? {
       kicker: 'Formation · 2025–26', title: 'École Polytechnique',
       body: "M.Sc. Data Science, spécialité Probabilités, Statistiques & Optimisation.",
-      meta: [['Cours', 'Apprentissage par renforcement · Monte-Carlo · Analyse convexe · Statistique en grande dimension']],
+      meta: [['Cours', 'Apprentissage par renforcement · Deep learning · Chaînes de Markov & Monte-Carlo · Optimisation convexe & entière · Hackathon (Hi!ckathon)']],
     } : {
       kicker: 'Education · 2025–26', title: 'École Polytechnique',
       body: 'M.Sc. Data Science, concentration in Probability, Statistics & Optimization.',
-      meta: [['Courses', 'Reinforcement learning · Monte-Carlo · Convex analysis · High-dimensional statistics']],
+      meta: [['Courses', 'Reinforcement learning · Deep learning · Markov chains & Monte-Carlo · Convex & integer optimization · Hackathon (Hi!ckathon)']],
+    },
+    prepa: (l) => l === 'fr' ? {
+      kicker: 'Classe préparatoire · 2020–22', title: 'Lycée Saint-Louis',
+      body: "Classe préparatoire aux concours des grandes écoles, MP option Informatique.",
+    } : {
+      kicker: 'Prep school · 2020–22', title: 'Lycée Saint-Louis',
+      body: "Classe préparatoire (competitive-exam track to France's top engineering schools), MP track with a Computer Science option.",
     },
     telecom: (l) => l === 'fr' ? {
       kicker: 'Formation · 2022–26', title: 'Télécom SudParis',
-      body: "Cycle ingénieur, majeure Data Science & Intelligence Artificielle.",
-      meta: [['Cours', 'Processus stochastiques · Réseaux de neurones · Renforcement']],
+      body: "Cycle ingénieur, majeure Data Science & Intelligence Artificielle, spécialisation 3A Modélisation et Statistique Appliquée.",
+      meta: [
+        ['Cours', 'Processus stochastiques · Réseaux de neurones · Apprentissage par renforcement'],
+        ['Vie associative', "Bureau des Internationaux (trésorier) · Intech, le club de robotique (chef de projet puis responsable de sa participation à la course de voiture autonome de l'ENS)"],
+      ],
     } : {
       kicker: 'Education · 2022–26', title: 'Télécom SudParis',
-      body: 'Engineering degree (M.Eng.), major in Data Science & Artificial Intelligence.',
-      meta: [['Courses', 'Stochastic processes · Neural networks · Reinforcement learning']],
+      body: 'Engineering degree (M.Eng.), major in Data Science & Artificial Intelligence, 3rd-year specialization in Applied Statistical Modeling.',
+      meta: [
+        ['Coursework', 'Stochastic processes · Neural networks · Reinforcement learning'],
+        ['Student life', "International Students' Office (treasurer) · Intech, the robotics club (project lead, then head of its entry in the ENS autonomous-car race)"],
+      ],
+    },
+    upfund: (l) => l === 'fr' ? {
+      kicker: 'Stage · 2023', title: 'Upfund',
+      body: "Stage de première année : une carte intelligente pilotée par un LLM — « trouve-moi les restaurants à moins de 50 m de la Seine à Paris » devient directement des points sur la carte, via OpenStreetMap et Overpass Turbo.",
+    } : {
+      kicker: 'Internship · 2023', title: 'Upfund',
+      body: 'First-year internship: a smart map driven by an LLM interpreter — "find me restaurants within 50m of the Seine in Paris" turns straight into pins on the map, via OpenStreetMap and Overpass Turbo.',
     },
     ensta: (l) => l === 'fr' ? {
       kicker: 'Recherche · 2024–25', title: 'ENSTA Paris',
-      body: "Stage de recherche en SLAM LiDAR-IMU. Conception d'un framework Python pour unifier des datasets robotiques hétérogènes — la graine d'Apairo.",
+      body: "Stage de recherche en SLAM LiDAR-IMU — mais l'essentiel du temps est parti dans la structure : concevoir l'architecture d'Apairo, le framework qui unifie les datasets robotiques hétérogènes, a pris plus de temps que la recherche elle-même. La graine de tout l'écosystème.",
     } : {
       kicker: 'Research · 2024–25', title: 'ENSTA Paris',
-      body: 'Research intern on LiDAR-IMU SLAM. Built a Python framework to unify heterogeneous robotics datasets — the seed that became Apairo.',
+      body: "Research internship on LiDAR-IMU SLAM — but most of the time went into the structure: designing Apairo's architecture, the framework that unifies heterogeneous robotics datasets, took longer than the research itself. The seed of the whole ecosystem.",
+    },
+    enstapfe: (l) => l === 'fr' ? {
+      kicker: 'Recherche · PFE · avril–août 2026', title: 'ENSTA Paris — Barakuda',
+      body: "De retour à ENSTA pour le PFE : des modèles de traversabilité par LiDAR, passés au crible de dizaines de configurations — apprentissage faiblement supervisé, pertes pondérées, approches par graphe, voxels contre pillars. Le terrain d'essai était le sien : des mois à piloter Barakuda, un rover, à travers forêts, hautes herbes et collines pour enregistrer ses propres données.",
+      meta: [
+        ['Étiquetage', 'Nuages de points annotés avec ses propres outils — Toaster, Splasher — et relus dans Projector'],
+        ['Infrastructure & open-source', "L'environnement Apairo enfin achevé, pour que chaque expérience se rejoue à l'identique · contributions à TorchSparse et au jeu de données TartanDrive v2"],
+      ],
+    } : {
+      kicker: 'Research · Final-year internship · Apr–Aug 2026', title: 'ENSTA Paris — Barakuda',
+      body: 'Back at ENSTA for his final-year research internship: LiDAR traversability models, benchmarked across dozens of configurations — weakly-supervised learning, weighted losses, graph-based approaches, voxels versus pillars. The test ground was his own: months spent driving Barakuda, a rover, through forests, tall grass and hills to record his own data.',
+      meta: [
+        ['Labeling', 'Point clouds annotated with his own tools — Toaster, Splasher — reviewed in Projector'],
+        ['Infrastructure & open-source', 'Finally finished the Apairo environment, so every experiment replays identically · contributed to TorchSparse and the TartanDrive v2 dataset'],
+      ],
     },
     rubicon: (l) => l === 'fr' ? {
       kicker: 'Expérience · 2025–26', title: 'Rubicon · Bangkok',
@@ -101,11 +152,11 @@ export const POIS = {
     },
     contact: (l) => l === 'fr' ? {
       kicker: 'Dire bonjour', title: 'Augustin Bresset',
-      body: "Data Scientist & Ingénieur, Paris. Actuellement ouvert à de nouvelles opportunités.",
+      body: "Data Scientist & Ingénieur, Paris. Pas à la recherche de nouvelles opportunités pour l'instant — plutôt concentré sur la poursuite de son chemin en recherche, du côté du deep learning.",
       links: [['Email ↗', 'mailto:augustin.bresset@polytechnique.edu'], ['GitHub ↗', 'https://github.com/augustin-bresset'], ['LinkedIn ↗', 'https://www.linkedin.com/in/augustin-b-3a0546142/']],
     } : {
       kicker: 'Say hello', title: 'Augustin Bresset',
-      body: 'Data Scientist & Engineer, Paris. Currently open to new opportunities.',
+      body: 'Data Scientist & Engineer, Paris. Not currently looking for new opportunities — focused instead on continuing down the research path, in deep learning.',
       links: [['Email ↗', 'mailto:augustin.bresset@polytechnique.edu'], ['GitHub ↗', 'https://github.com/augustin-bresset'], ['LinkedIn ↗', 'https://www.linkedin.com/in/augustin-b-3a0546142/']],
     },
   },
@@ -187,9 +238,11 @@ export const POIS = {
     stage: (l) => l === 'fr' ? {
       kicker: 'LiDAR 3D · Annotation', title: 'Toaster',
       body: "Étiqueter des nuages de points 3D le plus vite possible : vous sélectionnez, le segmenter fait le reste — un objet entier labellisé en un clic.",
+      links: [['Démo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     } : {
       kicker: '3D LiDAR · Annotation', title: 'Toaster',
       body: 'Label 3D point clouds as fast as possible: you select, the segmenter does the rest — a whole object labelled in one click.',
+      links: [['Demo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     },
     landmark: (l) => l === 'fr' ? {
       kicker: 'Sélection', title: 'Point · Boîte · Voxel',
@@ -202,12 +255,10 @@ export const POIS = {
       kicker: 'Sous le capot', title: 'Segmenters à la carte',
       body: "Branchez vos propres algorithmes : clustering (K-means, DBSCAN, HDBSCAN), détection de sol (CSF)… jusqu'à des modèles de segmentation, sémantique ou non.",
       meta: [['Stack', 'Python · Three.js · FastAPI · pywebview']],
-      links: [['Démo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     } : {
       kicker: 'Under the hood', title: 'Pluggable Segmenters',
       body: 'Plug in your own algorithms: clustering (K-means, DBSCAN, HDBSCAN), ground detection (CSF)… up to full segmentation models, semantic or not.',
       meta: [['Stack', 'Python · Three.js · FastAPI · pywebview']],
-      links: [['Demo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     },
   },
 
@@ -242,11 +293,11 @@ export const POIS = {
   projector: {
     marquee: (l) => l === 'fr' ? {
       kicker: 'Viewer · Multi-capteurs', title: 'Projector',
-      body: "Rejoue des séquences robotiques synchronisées, image par image : on scrute la timeline, on dispose les vues en mosaïque, et chaque capteur défile à son propre rythme.",
+      body: "Rejoue des séquences robotiques synchronisées, image par image : on scrute la timeline, on dispose les vues en mosaïque, et chaque capteur défile à son propre rythme. Indépendant d'Apairo mais compatible avec ses formats — comme Toaster et Splasher.",
       links: [['Démo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
     } : {
       kicker: 'Viewer · Multi-sensor', title: 'Projector',
-      body: 'Replays synchronized robotics sequences, frame by frame: scrub the timeline, dock views into a mosaic, and each sensor plays at its own native rate.',
+      body: 'Replays synchronized robotics sequences, frame by frame: scrub the timeline, dock views into a mosaic, and each sensor plays at its own native rate. Independent from Apairo but Apairo-friendly — like Toaster and Splasher.',
       links: [['Demo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
     },
     screens: (l) => l === 'fr' ? {
@@ -258,40 +309,33 @@ export const POIS = {
     },
     booth: (l) => l === 'fr' ? {
       kicker: 'La séance critique', title: 'Le Guichet des Confusions',
-      body: "Deux étiquetages, une bobine verte et une rouge : vrai/faux positifs et négatifs colorent chaque point, précision/rappel/IoU recalculés en direct — ne garder que le rouge ne montre que les erreurs du modèle.",
+      body: "Deux étiquetages, une bobine verte et une rouge : vrai/faux positifs et négatifs colorent chaque point, précision/rappel/IoU recalculés en direct. Mais la cabine ne fait pas que comparer — elle rejoue aussi n'importe quelle transformation (repère, filtre, projection) directement sur la scène, pour voir l'effet avant de le garder.",
       meta: [['Stack', 'Python · NumPy · FastAPI · Three.js']],
     } : {
       kicker: "The critics' screening", title: 'The Confusion Booth',
-      body: 'Two labelings, one green reel and one red: true/false positives and negatives colour every point, precision/recall/IoU recomputed live — keep only red and just the mistakes remain.',
+      body: "Two labelings, one green reel and one red: true/false positives and negatives colour every point, precision/recall/IoU recomputed live. But the booth doesn't just compare — it also replays any transformation (frame, filter, projection) directly on the scene, so you see the effect before you keep it.",
       meta: [['Stack', 'Python · NumPy · FastAPI · Three.js']],
-    },
-    lights: (l) => l === 'fr' ? {
-      kicker: 'Caméra', title: 'Projecteurs de Poursuite',
-      body: "La caméra peut suivre le robot comme un projecteur suit une vedette — orbite libre, mode poursuite verrouillé en translation, ou vue du ciel centrée sur l'ego, trajectoire en surimpression.",
-    } : {
-      kicker: 'Camera', title: 'Follow Spots',
-      body: 'The camera can track the robot like a spotlight follows a star — free orbit, translation-locked follow, or a BEV-follow view centred on ego, trajectory overlaid.',
     },
   },
 
   rubicon: {
     tower: (l) => l === 'fr' ? {
       kicker: 'Stage solo · Bangkok, 2025–26', title: 'Rubicon',
-      body: "Une manufacture de bijoux thaïlandaise (~40 salariés), qui vend à travers les grands salons professionnels internationaux. Envoyé seul pour toute la mission : migrer l'ERP historique — un système MS-SQL maison baptisé JMS — vers Odoo 18, sans jamais arrêter la production.",
-      meta: [['Rôle', 'Ingénieur logiciel — seul du début à la fin'], ['Durée', '13 mois, toujours actif']],
+      body: "Une manufacture de bijoux franco-thaïlandaise (~40 salariés), qui vend à travers les grands salons professionnels internationaux. Envoyé seul pour toute la mission : un mois d'audit complet d'abord — le poste de chacun, tous les processus métier, l'usage de chaque logiciel vue par vue, action par action — puis la reconstruction de chaque outil sur Odoo 18, modernisé sans jamais perdre l'utilisateur : mêmes repères, sans jamais arrêter la production.",
+      meta: [['Rôle', 'Ingénieur logiciel — audit puis développement, seul du début à la fin'], ['Durée', '13 mois, toujours actif']],
     } : {
       kicker: 'Solo internship · Bangkok, 2025–26', title: 'Rubicon',
-      body: 'A Thai jewelry manufacturer (~40 staff) selling through major international trade fairs. Sent alone for the whole mission: migrate their legacy ERP — an in-house MS-SQL system called JMS — to Odoo 18, without ever stopping production.',
-      meta: [['Role', 'Software engineer — solo start to finish'], ['Duration', '13 months, still active']],
+      body: 'A Franco-Thai jewelry manufacturer (~40 staff) selling through major international trade fairs. Sent alone for the whole mission: a month-long full audit first — every role, every business process, every piece of software in use, view by view and action by action — then rebuilding each tool on Odoo 18, modernized without ever losing the user: same landmarks, without ever stopping production.',
+      meta: [['Role', 'Software engineer — audit, then development, solo start to finish'], ['Duration', '13 months, still active']],
     },
     atelier: (l) => l === 'fr' ? {
-      kicker: 'PDP · Développement Produit', title: "L'Atelier",
-      body: "Le module qui pense un bijou avant qu'il existe : catalogue de pierres, cours du jour des métaux, coûts de façon, moteur de calcul de prix, gestion des modèles et variantes — jusqu'à un éditeur maison pour dessiner un nouveau modèle.",
-      meta: [['Échelle', '14 558 pierres · 48 699 produits · 13 056 modèles']],
+      kicker: 'PDP & Suivi de production', title: "L'Atelier",
+      body: "Le back-office de l'atelier : catalogue de pierres, cours du jour des métaux, coûts de façon, moteur de calcul de prix, gestion des modèles et variantes. Et sur le plancher de production : lecteur code-barres à chaque poste, temps et poids contrôlés en direct.",
+      meta: [['Échelle', 'Des tables de +100 000 lignes — pierres, produits, modèles']],
     } : {
-      kicker: 'PDP · Product Development', title: 'The Atelier',
-      body: 'The module that thinks up a piece of jewelry before it exists: a stone catalog, daily metal market prices, labor costing, a price-computation engine, model & variant management — down to a custom in-house editor for designing new models.',
-      meta: [['Scale', '14,558 stones · 48,699 products · 13,056 models']],
+      kicker: 'PDP & Production Tracking', title: 'The Atelier',
+      body: "The atelier's back office: a stone catalog, daily metal market prices, labor costing, a price-computation engine, model & variant management. And on the shop floor: a barcode reader at every station, time and weight checked live.",
+      meta: [['Scale', 'Tables with 100,000+ rows — stones, products, models']],
     },
     ledger: (l) => l === 'fr' ? {
       kicker: 'SIS · Ventes', title: 'Le Comptoir',
@@ -304,10 +348,10 @@ export const POIS = {
     },
     roots: (l) => l === 'fr' ? {
       kicker: 'Migration · Sous le parvis', title: 'Les Racines',
-      body: "Sous le parvis envahi de lianes dort encore JMS, le vieux système maison en MS-SQL. Un pipeline d'import a fait remonter chaque table vers Odoo — jusqu'aux 3,3 Go de photos produit — sans jamais interrompre la production.",
+      body: "Sous le parvis envahi de lianes dort encore JMS : plus de vingt ans d'activité en MS-SQL, chaque bijou lié à ses pierres, son historique de prix, ses commandes, ses clients. Un pipeline d'import a remonté toute cette toile vers Odoo — jusqu'aux 3,3 Go de photos produit — sans casser un seul lien, sans jamais interrompre la production.",
     } : {
       kicker: 'Migration · Beneath the forecourt', title: 'The Roots',
-      body: 'Below the vine-choked forecourt, JMS still sleeps — the old in-house MS-SQL system. An import pipeline pulled every table up into Odoo, down to 3.3GB of product photos, without ever stopping production.',
+      body: 'Below the vine-choked forecourt, JMS still sleeps: twenty-plus years of activity in MS-SQL, every piece of jewelry linked to its stones, its price history, its orders, its clients. An import pipeline pulled that whole web up into Odoo — down to 3.3GB of product photos — without breaking a single link, without ever stopping production.',
     },
   },
 };

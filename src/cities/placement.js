@@ -27,10 +27,13 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
   };
 
   // candidate sites: on land, NOT on the volcano cone, and inside the central
-  // REACHABLE disc (radius 260) so every city can be reached by panning — the
-  // camera target is clamped to a 300-radius disc (see camera.js _clampTarget) while
+  // REACHABLE disc (radius 380) so every city can be reached by panning — the
+  // camera target is clamped to a 420-radius disc (see camera.js _clampTarget) while
   // the terrain's far edge sits well past the fog wall, out of reach.
-  const REACH = 260;
+  // Sized generously: on ?mode=floating each city anchors its own flying island
+  // (gen/islands.js sizes islands from inter-city spacing), so a cramped disc makes
+  // unlinked islands crowd, fuse, or squeeze each other out entirely.
+  const REACH = 380;
   const cand = graph.sites.filter((s) => {
     if (s.biome === BIOME.OCEAN || s.biome === BIOME.VOLCANIC) return false;
     if (Math.hypot(s.x, s.z) > REACH) return false;

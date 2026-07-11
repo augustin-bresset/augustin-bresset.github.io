@@ -28,10 +28,13 @@ function pathAt(s) {
 
 // station order IS the chronology (content.js ids kept wired)
 const STATIONS = [
-  { id: 'telecom',       accent: '#3a7ca5', s: 0.16, style: 'house' },
+  { id: 'prepa',         accent: '#5b4a8f', s: 0.06, style: 'house' },
+  { id: 'telecom',       accent: '#3a7ca5', s: 0.16, style: 'office', scale: 1.6 },
+  { id: 'upfund',        accent: '#2f8f7a', s: 0.28, style: 'house' },
   { id: 'ensta',         accent: '#6b9a47', s: 0.40, style: 'house' },
   { id: 'rubicon',       accent: '#d4a84b', s: 0.62, style: 'office' },
   { id: 'polytechnique', accent: '#b5402f', s: 0.84, style: 'dome' },
+  { id: 'enstapfe',      accent: '#c2703c', s: 0.90, style: 'house', scale: 1.45, off: 17 },
 ];
 
 // ---- flying wood-and-canvas contraptions (unchanged town DNA) ------------------
@@ -249,11 +252,11 @@ export function build() {
   for (const st of STATIONS) {
     const p = pathAt(st.s);
     // the building sits OUTSIDE the shaft street, door facing the shaft
-    const off = 8.5;
+    const off = st.off ?? 8.5;
     const ox = Math.cos(p.a) * (R0 + (R1 - R0) * st.s + off);
     const oz = Math.sin(p.a) * (R0 + (R1 - R0) * st.s + off);
     const school = makeSchool(st.accent, st.style);
-    school.scale.setScalar(1.35);              // village-scale buildings, easy to read & click
+    school.scale.setScalar(st.scale ?? 1.35);   // village-scale buildings, easy to read & click
     school.position.set(ox, 0.1, oz);
     school.rotation.y = Math.atan2(p.x - ox, p.z - oz);        // door toward the shaft
     g.add(school); tagPOI(school, st.id);
@@ -304,7 +307,34 @@ export function build() {
         const f = on ? (Math.sin(t * 1.6) * 0.5 + 0.5) : 0.05;
         crate.position.y = 0.6 + f * 3.6;
       };
-    } else {                                       // polytechnique: a small brass orrery
+    } else if (st.id === 'prepa') {                // a stack of books + a swinging compass
+      mech.add(cyl(0.12, 0.16, 2.0, WOOD, 5, { pos: [1.6, 1.0, 0] }));
+      const books = [0xb5402f, 0x3a7ca5, 0x6b9a47].map((c, i) =>
+        box(0.9, 0.16, 0.65, c, { pos: [1.6, 2.15 + i * 0.18, 0], roughness: 0.85 }));
+      books.forEach((b) => mech.add(b));
+      const compass = new THREE.Group(); compass.position.set(1.6, 2.85, 0); mech.add(compass);
+      compass.add(box(0.05, 1.1, 0.05, BRASS, { cast: false }));
+      compass.add(box(0.05, 0.7, 0.05, BRASS, { pos: [0, -0.35, 0], cast: false }));
+      mechAnim = (t, on) => {
+        compass.rotation.z = Math.sin(t * (on ? 2.2 : 0.3)) * (on ? 0.6 : 0.15);
+        books.forEach((b, i) => { b.rotation.y = on ? Math.sin(t * 3 + i) * 0.15 : 0; });
+      };
+    } else if (st.id === 'upfund') {               // a paper map, pins lighting up as the LLM finds them
+      mech.add(cyl(0.12, 0.16, 1.6, WOOD, 5, { pos: [1.6, 0.8, 0] }));
+      mech.add(box(1.5, 0.08, 1.05, 0xe4d9b8, { pos: [1.6, 1.65, 0], roughness: 0.85 }));
+      const pins = [];
+      for (let i = 0; i < 4; i++) {
+        const pin = box(0.11, 0.42, 0.11, 0xc4763a, {
+          pos: [1.25 + (i % 2) * 0.65, 1.9, -0.25 + Math.floor(i / 2) * 0.5],
+          emissive: 0xc4763a, emissiveIntensity: 0.2, cast: false,
+        });
+        mech.add(pin); pins.push(pin);
+      }
+      mechAnim = (t, on) => {
+        const wave = on ? Math.floor((t * 1.6) % 4) : -1;
+        pins.forEach((pn, i) => { pn.material.emissiveIntensity = i <= wave ? 1.6 : 0.2; });
+      };
+    } else if (st.id === 'polytechnique') {        // a small brass orrery
       mech.add(cyl(0.12, 0.16, 2.6, WOOD, 5, { pos: [1.6, 1.3, 0] }));
       const orr = new THREE.Group(); orr.position.set(1.6, 3.0, 0); mech.add(orr);
       orr.add(new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6),
@@ -318,6 +348,22 @@ export function build() {
         const sp = on ? 1.6 : 0.15;
         m1.position.set(Math.cos(t * sp) * 0.85, 0, Math.sin(t * sp) * 0.85);
         m2.position.set(Math.cos(-t * sp * 1.7 + 1) * 1.3, 0, Math.sin(-t * sp * 1.7 + 1) * 1.3);
+      };
+    } else if (st.id === 'enstapfe') {             // the Barakuda rover, recording its own dataset
+      const rover = new THREE.Group(); rover.position.set(1.7, 0, 0); mech.add(rover);
+      rover.add(box(0.9, 0.4, 1.5, 0x3a3f46, { pos: [0, 0.5, 0], roughness: 0.6, metalness: 0.3 }));
+      const lidar = cyl(0.22, 0.22, 0.3, 0x8a94a2, 10, { pos: [0, 0.88, 0], metalness: 0.5, roughness: 0.3 });
+      rover.add(lidar);
+      for (const [wx, wz] of [[-0.52, 0.62], [0.52, 0.62], [-0.52, -0.62], [0.52, -0.62]]) {
+        rover.add(cyl(0.28, 0.28, 0.22, 0x1a1a1a, 8, { pos: [wx, 0.28, wz], roughness: 0.9 }));
+      }
+      const trail = pointCloud([{ cx: 0, cz: -1.3, color: 0xc2703c, n: 14, spread: 0.9, y: 0.3 }], { size: 0.1 });
+      rover.add(trail);
+      mechAnim = (t, on) => {
+        const sp = on ? 1 : 0.15;
+        rover.position.x = 1.7 + Math.sin(t * sp) * 1.0;
+        lidar.rotation.y = on ? t * 5 : t * 0.4;
+        trail.rotation.y = -t * 0.6;
       };
     }
     mech.rotation.y = p.a + Math.PI / 2;           // tuck the machine beside the street

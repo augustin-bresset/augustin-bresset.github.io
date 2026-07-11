@@ -18,6 +18,84 @@ const RED = 0xc81e3a, GREEN = 0x3ee08a;
 const CYAN = 0x6fe0ff, VIOLET = 0x9a7bff;
 const BEV_RAMP = [0x1c2b57, 0x27508f, 0x3d84c4, 0x74c4e8];
 
+// ===== THE STUDIO GATE — two interchangeable builders (see GATE_STYLE in build())
+// original: flanking fluted Art Deco pillars + a flat lintel band.
+function buildGateArtDeco(wall, gp0, gp1, wallH) {
+  for (const p of [gp0, gp1]) {
+    wall.add(cyl(1.1, 1.3, wallH + 3.2, ONYX_LO, 8, { pos: [p.x, (wallH + 3.2) / 2, p.z], roughness: 0.75 }));
+    for (let k = 0; k < 6; k++) {
+      const a = k * (Math.PI / 3);
+      wall.add(box(0.18, (wallH + 3.2) * 0.8, 0.18, GOLD, {
+        pos: [p.x + Math.cos(a) * 1.15, (wallH + 3.2) / 2, p.z + Math.sin(a) * 1.15],
+        emissive: GOLD, emissiveIntensity: 1.0, cast: false, receive: false,
+      }));
+    }
+    wall.add(box(2.6, 0.5, 2.6, GOLD, { pos: [p.x, wallH + 3.45, p.z], emissive: GOLD, emissiveIntensity: 0.5, cast: false }));
+  }
+  const gateLen = Math.hypot(gp1.x - gp0.x, gp1.z - gp0.z);
+  const gateAng = Math.atan2(gp1.x - gp0.x, gp1.z - gp0.z);
+  const lintel = box(1.6, 1.0, gateLen, ONYX_LO, {
+    pos: [(gp0.x + gp1.x) / 2, wallH + 3.6, (gp0.z + gp1.z) / 2], roughness: 0.75,
+  });
+  lintel.rotation.y = gateAng; wall.add(lintel);
+  const lintelBand = box(1.8, 0.3, gateLen, GOLD, {
+    pos: [(gp0.x + gp1.x) / 2, wallH + 4.25, (gp0.z + gp1.z) / 2], emissive: GOLD, emissiveIntensity: 0.5, cast: false,
+  });
+  lintelBand.rotation.y = gateAng; wall.add(lintelBand);
+  return { spin: null };
+}
+
+// new default: a grand rounded arch + a spinning globe at the apex — the SHAPE
+// language of the Universal Studios gate (arch + rotating Earth), built from a
+// plain sphere and perpendicular ring struts rather than any copied logo art.
+function buildGateUniversal(wall, gp0, gp1, wallH) {
+  const gateLen = Math.hypot(gp1.x - gp0.x, gp1.z - gp0.z);
+  const gateAng = Math.atan2(gp1.x - gp0.x, gp1.z - gp0.z);
+  const mx = (gp0.x + gp1.x) / 2, mz = (gp0.z + gp1.z) / 2;
+  const pillarH = wallH + 2.4;
+  for (const p of [gp0, gp1]) {
+    wall.add(cyl(1.3, 1.5, pillarH, CREAM, 8, { pos: [p.x, pillarH / 2, p.z], roughness: 0.8 }));
+    wall.add(cyl(1.5, 1.5, 0.4, GOLD, 8, { pos: [p.x, pillarH + 0.2, p.z], emissive: GOLD, emissiveIntensity: 0.4, cast: false }));
+  }
+  // the arch: a half-torus spanning the two pillars, bulging up to its apex
+  const archR = gateLen / 2, archTube = 1.5;
+  const archGeo = new THREE.TorusGeometry(archR, archTube, 10, 28, Math.PI);
+  archGeo.rotateY(Math.PI / 2);        // span along local Z, matching the gateAng convention used elsewhere
+  const arch = new THREE.Mesh(archGeo, new THREE.MeshStandardMaterial({ color: CREAM, flatShading: true, roughness: 0.8 }));
+  arch.position.set(mx, pillarH, mz); arch.rotation.y = gateAng; wall.add(arch);
+  const trimGeo = new THREE.TorusGeometry(archR, archTube * 0.28, 6, 28, Math.PI);
+  trimGeo.rotateY(Math.PI / 2);
+  const trim = new THREE.Mesh(trimGeo, new THREE.MeshStandardMaterial({ color: GOLD, emissive: GOLD, emissiveIntensity: 0.5, flatShading: true }));
+  trim.position.set(mx, pillarH + archTube * 0.75, mz); trim.rotation.y = gateAng; wall.add(trim);
+
+  // the spinning globe crowning the arch
+  const globe = new THREE.Group();
+  globe.position.set(mx, pillarH + archR + 3.2, mz);
+  wall.add(globe);
+  globe.add(new THREE.Mesh(new THREE.SphereGeometry(2.6, 16, 12),
+    new THREE.MeshStandardMaterial({ color: GOLD_HI, flatShading: true, roughness: 0.5, metalness: 0.2 })));
+  const ringMat = new THREE.MeshStandardMaterial({ color: GOLD, emissive: GOLD, emissiveIntensity: 0.5, flatShading: true });
+  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.16, 6, 24), ringMat); globe.add(ring1);
+  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.16, 6, 24), ringMat);
+  ring2.rotation.x = Math.PI / 2; globe.add(ring2);
+  const ring3 = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.16, 6, 24), ringMat);
+  ring3.rotation.x = Math.PI / 2; ring3.rotation.y = Math.PI / 3; globe.add(ring3);
+  globe.add(cyl(1.0, 1.6, 1.0, CREAM, 10, { pos: [0, -3.1, 0], roughness: 0.8 }));   // collar seating it on the arch
+  return { spin: globe };
+}
+
+// a raked shore/cross-tie between two 3D points — the backlot truss holding a
+// false-front skyline flat up from behind (see the METROPOLIS SKYLINE section)
+function brace(ax, ay, az, bx, by, bz, color) {
+  const a = new THREE.Vector3(ax, ay, az), b = new THREE.Vector3(bx, by, bz);
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  const m = box(0.3, len, 0.3, color, { roughness: 0.9, cast: false });
+  m.position.addVectors(a, b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  return m;
+}
+
 export function build() {
   const g = new THREE.Group();
 
@@ -94,15 +172,17 @@ export function build() {
   portal.group.rotation.y = Math.PI;
   hero.add(portal.group);
 
-  // ===== THE METROPOLIS SKYLINE — a brooding backdrop behind the tower ==========
-  // a handful of window-slit Art Deco towers looming behind the palace (the old
-  // Fritz Lang silhouette the marquee could be playing footage of), one elevated
-  // sky-bridge slung between the two tallest with light-pulses crossing it. Warm
-  // graphite stone, not black monoliths — banded setbacks, corner fluting and a
-  // stepped brass crown on each, echoing the palace's own vocabulary at a distance.
+  // ===== THE METROPOLIS SKYLINE — Hollywood backlot FALSE FRONTS, not real
+  // buildings: painted-flat facades (window-slit Art Deco towers, the old Fritz
+  // Lang silhouette the marquee could be playing footage of) thin enough to be
+  // obviously flat, held up from behind by a raked-shore truss + sandbags — the
+  // reveal is hidden from the carpet's approach (−Z, away from the camera's
+  // usual +Z/+X quadrant) but plain to see if you orbit around back.
   const SKY_COL = [0x4b4550, 0x554c50, 0x413b46];
   const SKY_BAND = 0xc9b98f;    // pale stone banding at each tier setback
   const SKY_BRASS = 0x9c8a5a;   // dulled brass fluting/crown — quieter than the palace's gold
+  const BRACE = 0x4a3a26, BRACE_LO = 0x36291a, SANDBAG = 0x6b5a42;
+  const FLAT_D = 1.1;           // a real building would be tw.d deep — this is a painted flat
   const SKYLINE = [
     { x: -21, z: -23, w: 5.5, d: 5.5, h: 21, tiers: 2 },
     { x: -11, z: -30, w: 6.5, d: 6.0, h: 29, tiers: 3 },
@@ -118,11 +198,11 @@ export function build() {
     for (let k = 0; k < tw.tiers; k++) {
       const f = 1 - k * 0.3;
       const th = tw.h * (k === 0 ? 0.55 : k === 1 ? 0.3 : 0.15);
-      if (k > 0) grp.add(box(tw.w * (1 - (k - 1) * 0.3) * 1.04, 0.22, tw.d * (1 - (k - 1) * 0.3) * 1.04, SKY_BAND, { pos: [0, y, 0], roughness: 0.6 }));
-      grp.add(box(tw.w * f, th, tw.d * f, col, { pos: [0, y + th / 2, 0], roughness: 0.8 }));
+      if (k > 0) grp.add(box(tw.w * (1 - (k - 1) * 0.3) * 1.04, 0.22, FLAT_D * 1.15, SKY_BAND, { pos: [0, y, 0], roughness: 0.6 }));
+      grp.add(box(tw.w * f, th, FLAT_D, col, { pos: [0, y + th / 2, 0], roughness: 0.8 }));
       if (k === 0) {
         // corner fluting on the tallest, most-visible base tier
-        const hw = tw.w * f / 2, hd = tw.d * f / 2;
+        const hw = tw.w * f / 2, hd = FLAT_D / 2;
         for (const [fx, fz] of [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd]]) {
           grp.add(box(0.16, th * 0.86, 0.16, SKY_BRASS, {
             pos: [fx, y + th / 2, fz], emissive: SKY_BRASS, emissiveIntensity: 0.45, cast: false, receive: false,
@@ -132,17 +212,28 @@ export function build() {
       y += th;
     }
     // stepped brass crown
-    grp.add(box(tw.w * 0.34, 0.5, tw.d * 0.34, SKY_BRASS, { pos: [0, y + 0.25, 0], emissive: SKY_BRASS, emissiveIntensity: 0.5, cast: false }));
-    grp.add(box(tw.w * 0.18, 0.45, tw.d * 0.18, SKY_BRASS, { pos: [0, y + 0.7, 0], emissive: SKY_BRASS, emissiveIntensity: 0.5, cast: false }));
+    grp.add(box(tw.w * 0.34, 0.5, FLAT_D * 0.3, SKY_BRASS, { pos: [0, y + 0.25, 0], emissive: SKY_BRASS, emissiveIntensity: 0.5, cast: false }));
+    grp.add(box(tw.w * 0.18, 0.45, FLAT_D * 0.16, SKY_BRASS, { pos: [0, y + 0.7, 0], emissive: SKY_BRASS, emissiveIntensity: 0.5, cast: false }));
     // sparse deterministic grid of tiny lit windows on the +Z face
     for (let r = 0; r < Math.floor((tw.h * 0.82) / 3.2); r++) {
       for (let c = -1; c <= 1; c++) {
         if ((r * 7 + (c + 1) * 5 + ti * 3) % 4 !== 0) continue;
         grp.add(box(0.5, 1.0, 0.14, 0xf3d38a, {
-          pos: [c * (tw.w * 0.28), 1.6 + r * 3.2, tw.d / 2 + 0.04],
+          pos: [c * (tw.w * 0.28), 1.6 + r * 3.2, FLAT_D / 2 + 0.04],
           emissive: 0xf3d38a, emissiveIntensity: 1.1, cast: false, receive: false,
         }));
       }
+    }
+    // ===== THE BACKSTAGE TRUSS — raked shores + cross-ties holding the flat up
+    // from behind, plus sandbag weights at their feet (the classic backlot tell)
+    const totalH = y, backZ = -FLAT_D / 2 - 0.1, spread = tw.w * 0.4;
+    for (const sx of [-spread, spread]) {
+      grp.add(brace(sx, 0.1, backZ - 3.0, sx * 0.32, totalH * 0.78, backZ, BRACE));
+      grp.add(brace(sx * 0.6, 0.1, backZ - 1.5, sx * 0.32, totalH * 0.4, backZ, BRACE));
+      grp.add(box(1.1, 0.6, 0.9, SANDBAG, { pos: [sx, 0.3, backZ - 3.0], roughness: 1, cast: false }));
+    }
+    for (let hy = totalH * 0.22; hy < totalH * 0.75; hy += totalH * 0.26) {
+      grp.add(box(spread * 0.66, 0.18, 0.2, BRACE_LO, { pos: [0, hy, backZ], roughness: 0.9, cast: false }));
     }
   });
   // the sky-bridge, slung between the two tallest towers
@@ -161,13 +252,65 @@ export function build() {
     bridge.add(p); bridgePulses.push({ m: p, off: i / 3 });
   }
 
+  // ===== THE STUDIO WALL — a Hollywood backlot perimeter, gated on the carpet's
+  // own axis (the classic studios — Paramount, Warners, MGM — were famously walled
+  // compounds with one grand gate). Cream stucco + gold coping, echoing the
+  // palace's own Art Deco vocabulary; fluted pilasters carry small warm sconces.
+  const WALL_N = 14, WALL_R = 50, WALL_H = 4.2;
+  const wallPts = [];
+  for (let i = 0; i < WALL_N; i++) {
+    const phi = (i / WALL_N) * Math.PI * 2;
+    wallPts.push({ x: Math.sin(phi) * WALL_R, z: Math.cos(phi) * WALL_R });
+  }
+  const wall = new THREE.Group(); g.add(wall);
+  const GATE_I = WALL_N - 1;   // the segment between pts[GATE_I] and pts[0] is left open
+  for (let i = 0; i < WALL_N; i++) {
+    if (i === GATE_I) continue;
+    const a = wallPts[i], b = wallPts[(i + 1) % WALL_N];
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+    const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, ang = Math.atan2(dx, dz);
+    const panel = box(1.2, WALL_H, len, CREAM, { pos: [mx, WALL_H / 2, mz], roughness: 0.85 });
+    panel.rotation.y = ang; wall.add(panel);
+    const cap = box(1.4, 0.32, len + 0.3, GOLD, { pos: [mx, WALL_H + 0.16, mz], emissive: GOLD, emissiveIntensity: 0.35, cast: false });
+    cap.rotation.y = ang; wall.add(cap);
+  }
+  // fluted pilasters at every vertex — skipping the two flanking the gate, which
+  // get taller dedicated gate pillars instead
+  for (let i = 0; i < WALL_N; i++) {
+    if (i === 0 || i === GATE_I) continue;
+    const p = wallPts[i];
+    wall.add(cyl(0.75, 0.85, WALL_H + 1.0, CREAM, 8, { pos: [p.x, (WALL_H + 1.0) / 2, p.z], roughness: 0.8 }));
+    wall.add(box(0.9, 0.4, 0.9, GOLD, { pos: [p.x, WALL_H + 1.4, p.z], emissive: GOLD, emissiveIntensity: 0.5, cast: false }));
+    wall.add(box(0.35, 0.4, 0.35, GOLD_HI, { pos: [p.x * 0.97, WALL_H - 0.4, p.z * 0.97], emissive: GOLD_HI, emissiveIntensity: 1.1, cast: false, receive: false }));
+  }
+  // ===== THE STUDIO GATE — two builders on hand, one active =====================
+  // Augustin asked to keep the original Art Deco gate available even after
+  // switching the default to a Universal-Studios-style rounded arch + spinning
+  // globe — flip GATE_STYLE to swap back instantly, nothing is deleted.
+  const GATE_STYLE = 'universal';   // 'universal' | 'artdeco'
+  const gp0 = wallPts[0], gp1 = wallPts[GATE_I];
+  const gateRig = GATE_STYLE === 'universal'
+    ? buildGateUniversal(wall, gp0, gp1, WALL_H)
+    : buildGateArtDeco(wall, gp0, gp1, WALL_H);
+
+  // ===== THE PLAZA DECK — a real paved platform under the carpet + screens =======
+  // world.js's flattenPlateau blends the terrain toward flat but deliberately
+  // keeps "a whisper of the original relief" (its own comment — core weight caps
+  // at 0.94, never 1.0), so bare ground under a city can still carry a real bump.
+  // The carpet sat almost flush on that bare ground (y=0.05) with no deck to
+  // stand on, unlike its siblings' own disclaimed "no platform" cities — on a
+  // seed with enough residual relief it got swallowed outright. A solid deck
+  // fixes it for every seed, not just the one that happened to be flat enough.
+  const DECK_Y = 0.4;
+  g.add(box(38, 0.6, 48, 0x2a2620, { pos: [0, DECK_Y - 0.3, 12.5], roughness: 0.9 }));
+
   // ===== RED CARPET from the doors toward the triple bill ========================
   const carpet = glow(5.4, 20, RED, 1.0);
-  carpet.rotation.x = -Math.PI / 2; carpet.position.set(0, 0.05, 19);
+  carpet.rotation.x = -Math.PI / 2; carpet.position.set(0, DECK_Y + 0.05, 19);
   carpet.material.transparent = true; carpet.material.opacity = 0.82;
   g.add(carpet);
   for (const z of [11, 15, 19, 23, 27]) for (const x of [-3.1, 3.1]) {
-    g.add(cyl(0.14, 0.17, 1.3, GOLD, 8, { pos: [x, 0.65, z], roughness: 0.4, metalness: 0.5 }));
+    g.add(cyl(0.14, 0.17, 1.3, GOLD, 8, { pos: [x, DECK_Y + 0.65, z], roughness: 0.4, metalness: 0.5 }));
   }
 
   // ===== THE TRIPLE BILL — a shared proscenium wall, three screens ===============
@@ -248,7 +391,7 @@ export function build() {
   ];
   const klieg = [];
   for (const tw of TOWERS) {
-    const mast = new THREE.Group(); mast.position.set(tw.x, 0, tw.z); g.add(mast); tagPOI(mast, 'lights');
+    const mast = new THREE.Group(); mast.position.set(tw.x, 0, tw.z); g.add(mast);
     mast.add(cyl(0.42, 0.6, 7.2, 0x2b2a32, 8, { pos: [0, 3.6, 0], metalness: 0.4, roughness: 0.5 }));
     mast.add(cyl(1.0, 1.1, 1.1, 0x3a3a44, 8, { pos: [0, 7.4, 0], metalness: 0.6, roughness: 0.3 }));
     const az = new THREE.Group(); az.position.set(0, 7.9, 0); mast.add(az);
@@ -273,7 +416,6 @@ export function build() {
   addBeacon('marquee', '#d4af37', 0, 37, 0);
   addBeacon('screens', '#6fe0ff', 0, 9, 30);
   addBeacon('booth', '#3ee08a', -27, 6.5, 15);
-  addBeacon('lights', '#f6dd8c', 18, 12, 3);
 
   tagPickable(g, 'projector');
 
@@ -320,6 +462,9 @@ export function build() {
         k.az.rotation.y = t * k.tw.sp + k.tw.ph;
         k.tilt.rotation.x = k.tw.base + Math.sin(t * k.tw.ts + k.tw.ph * 1.3) * 0.22;
       }
+
+      // the studio gate's globe, slowly turning (only present in the Universal-style gate)
+      if (gateRig.spin) gateRig.spin.rotation.y = t * 0.3;
     },
   };
 }
