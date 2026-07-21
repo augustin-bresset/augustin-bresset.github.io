@@ -194,6 +194,9 @@ export class Navigation {
   _enterCity(city) {
     this.state = 'city';
     this.activeCity = city;
+    // GoatCounter custom event: which city gets visited (script is async and
+    // adblocker-prone, so the global may be absent)
+    window.goatcounter?.count?.({ path: 'city/' + city.id, event: true });
     // If this city's portal is a WALL (vertical, on a façade), switch the shared
     // portal camera to the full A→B transform so the window shows the world from
     // above instead of the horizon. Horizontal discs keep the plain lift.
