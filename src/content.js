@@ -8,6 +8,72 @@
 //   links  — [[label, href], …]
 // CITY_LABELS[cityId] = (lang) => [name, subtitle]  — the floating plaque.
 
+// ── Evocative extras for field notes ────────────────────────────────────────
+// A note may carry ONE `figure` (trusted inline SVG / <img>) and/or a `code`
+// snippet — kept here, language-neutral, so both FR/EN branches share one copy.
+// SVGs are hand-drawn line-art in the site's ink palette so they sit on parchment;
+// code is faithful to the real API (see apairo_visu README) or a clearly generic
+// contract, never an invented framework call.
+
+// Apairo — the lazy, composable pipeline (real apairo API).
+const CODE_APAIRO = `import apairo
+
+ds = apairo.Goose3DDataset("/data/goose")
+ds = ds.synchronize(reference="lidar")
+ds.transform("lidar", ground_height, output="ground")
+train = ds.filter(valid_idx)   # a lazy view, not a copy`;
+
+// Toaster — the pluggable-segmenter contract (generic, not a claimed API).
+const CODE_TOASTER = `# points in, one label per point
+def segment(points, seed_idx):
+    return dbscan(points, eps=0.5)   # or a model, CSF…`;
+
+// Apairo — four sensor streams (each at its own rate) synchronized onto one clock.
+const FIG_APAIRO_SYNC = `<svg viewBox="0 0 280 104" role="img" aria-label="Four sensor streams synchronized onto one reference clock">
+  <g font-family="EB Garamond, serif" font-size="7.5" fill="#8B6845">
+    <text x="2" y="19">lidar</text><text x="2" y="39">cam</text><text x="2" y="59">imu</text><text x="2" y="79">pose</text>
+  </g>
+  <g stroke-width="2.2" stroke-linecap="round" fill="none">
+    <line x1="32" y1="16" x2="150" y2="16" stroke="#44aa99" stroke-dasharray="2.2 11"/>
+    <line x1="32" y1="36" x2="150" y2="36" stroke="#88ccee" stroke-dasharray="2.2 4"/>
+    <line x1="32" y1="56" x2="150" y2="56" stroke="#cc6677" stroke-dasharray="2.2 2.2"/>
+    <line x1="32" y1="76" x2="150" y2="76" stroke="#57a957" stroke-dasharray="2.2 8"/>
+  </g>
+  <g stroke="#2C1A0E" stroke-width="1" fill="none" opacity="0.45">
+    <path d="M150 16 L179 43"/><path d="M150 36 L179 45"/><path d="M150 56 L179 49"/><path d="M150 76 L179 51"/>
+  </g>
+  <circle cx="192" cy="47" r="13" fill="#dda42a" stroke="#2C1A0E" stroke-width="1.5"/>
+  <g stroke="#2C1A0E" stroke-width="1.3" stroke-linecap="round"><line x1="192" y1="47" x2="192" y2="39"/><line x1="192" y1="47" x2="198" y2="50"/></g>
+  <line x1="205" y1="47" x2="227" y2="47" stroke="#2C1A0E" stroke-width="1.5"/>
+  <path d="M223 43 l6 4 -6 4" fill="none" stroke="#2C1A0E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="231" y="38" width="19" height="18" rx="2" fill="none" stroke="#2C1A0E" stroke-width="1.5"/>
+  <g font-family="EB Garamond, serif" font-size="7.5" fill="#5C3D20" text-anchor="middle"><text x="192" y="73">sync</text><text x="240" y="71">frame</text></g>
+</svg>`;
+
+// Splasher — a bird's-eye grid, a drivable corridor labelled cell by cell.
+const FIG_SPLASHER_BEV = `<svg viewBox="0 0 200 128" role="img" aria-label="Bird's-eye grid with a drivable corridor labelled cell by cell">
+  <g fill="#00d8ff" opacity="0.32">
+    <rect x="80" y="88" width="20" height="20"/><rect x="80" y="68" width="20" height="20"/><rect x="100" y="68" width="20" height="20"/><rect x="100" y="48" width="20" height="20"/><rect x="120" y="48" width="20" height="20"/><rect x="120" y="28" width="20" height="20"/><rect x="140" y="28" width="20" height="20"/><rect x="140" y="8" width="20" height="20"/>
+  </g>
+  <g stroke="#2C1A0E" stroke-width="0.8" opacity="0.5">
+    <line x1="20" y1="8" x2="180" y2="8"/><line x1="20" y1="28" x2="180" y2="28"/><line x1="20" y1="48" x2="180" y2="48"/><line x1="20" y1="68" x2="180" y2="68"/><line x1="20" y1="88" x2="180" y2="88"/><line x1="20" y1="108" x2="180" y2="108"/>
+    <line x1="20" y1="8" x2="20" y2="108"/><line x1="40" y1="8" x2="40" y2="108"/><line x1="60" y1="8" x2="60" y2="108"/><line x1="80" y1="8" x2="80" y2="108"/><line x1="100" y1="8" x2="100" y2="108"/><line x1="120" y1="8" x2="120" y2="108"/><line x1="140" y1="8" x2="140" y2="108"/><line x1="160" y1="8" x2="160" y2="108"/><line x1="180" y1="8" x2="180" y2="108"/>
+  </g>
+  <path d="M90 109 l0 9 M84 118 l6 -6 6 6" fill="none" stroke="#2C1A0E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+// Projector — the triple bill: 3D cloud, 2D camera, top-down BEV, all in step.
+const FIG_PROJECTOR_SCREENS = `<svg viewBox="0 0 280 92" role="img" aria-label="Three synchronized screens: 3D cloud, 2D camera, top-down BEV">
+  <g fill="#d4af37"><rect x="6" y="8" width="78" height="5"/><rect x="101" y="8" width="78" height="5"/><rect x="196" y="8" width="78" height="5"/></g>
+  <g stroke="#2C1A0E" stroke-width="1.5" fill="none"><rect x="6" y="8" width="78" height="60" rx="2"/><rect x="101" y="8" width="78" height="60" rx="2"/><rect x="196" y="8" width="78" height="60" rx="2"/></g>
+  <g fill="#5C3D20"><circle cx="22" cy="54" r="1.4"/><circle cx="30" cy="46" r="1.4"/><circle cx="36" cy="59" r="1.4"/><circle cx="43" cy="41" r="1.4"/><circle cx="49" cy="52" r="1.4"/><circle cx="56" cy="61" r="1.4"/><circle cx="61" cy="47" r="1.4"/><circle cx="69" cy="55" r="1.4"/><circle cx="31" cy="32" r="1.4"/><circle cx="47" cy="30" r="1.4"/><circle cx="59" cy="35" r="1.4"/><circle cx="71" cy="42" r="1.4"/></g>
+  <circle cx="166" cy="26" r="3" fill="#d4af37"/>
+  <g stroke="#5C3D20" stroke-width="1.2" fill="none"><line x1="107" y1="50" x2="173" y2="50"/><rect x="126" y="38" width="16" height="12"/></g>
+  <g stroke="#5C3D20" stroke-width="0.8" opacity="0.7" fill="none"><line x1="206" y1="20" x2="264" y2="20"/><line x1="206" y1="38" x2="264" y2="38"/><line x1="206" y1="56" x2="264" y2="56"/><line x1="206" y1="20" x2="206" y2="56"/><line x1="225" y1="20" x2="225" y2="56"/><line x1="244" y1="20" x2="244" y2="56"/><line x1="264" y1="20" x2="264" y2="56"/></g>
+  <rect x="225" y="38" width="19" height="18" fill="#00d8ff" opacity="0.32"/>
+  <g font-family="EB Garamond, serif" font-size="8" fill="#5C3D20" text-anchor="middle"><text x="45" y="83">3D</text><text x="140" y="83">2D</text><text x="235" y="83">BEV</text></g>
+</svg>`;
+
 export const CITY_LABELS = {
   apairo: (l) => l === 'fr' ? ['Apairo', 'Données Robotique'] : ['Apairo', 'Robotics Data'],
   toaster: (l) => l === 'fr' ? ['Toaster', 'Annotation 3D'] : ['Toaster', '3D Annotation'],
@@ -22,6 +88,37 @@ export const CITY_LABELS = {
 export const CITY_ACCENT = {
   apairo: '#dda42a', toaster: '#e10600', splasher: '#00d8ff', projector: '#d4af37', about: '#c4763a',
   rubicon: '#a56cc1',
+};
+
+// CITY_LINKS[cityId] = (lang) => [[label, href], …] — the "front doors" of a project,
+// surfaced in a side panel while a settlement is in focus (see ui.js showCityLinks).
+// Curated, 2–4 primary destinations per city — NOT every sub-repo. Return [] to hide
+// the panel (Rubicon is client work, its code is never shared).
+export const CITY_LINKS = {
+  apairo: (l) => [
+    ['Site', 'https://apairo-robotics.github.io/'],
+    // the ORG, not the core repo — one row surfaces the whole ecosystem
+    // (apairo, extractor, transform, preprocess, apairo_visu, …)
+    ['GitHub', 'https://github.com/apairo-robotics'],
+  ],
+  toaster: (l) => [
+    [l === 'fr' ? 'Démo' : 'Demo', 'https://huggingface.co/spaces/SmaugC137/toaster'],
+    ['GitHub', 'https://github.com/augustin-bresset/toaster'],
+  ],
+  splasher: (l) => [
+    [l === 'fr' ? 'Démo' : 'Demo', 'https://huggingface.co/spaces/SmaugC137/splasher'],
+    ['GitHub', 'https://github.com/augustin-bresset/splasher'],
+  ],
+  projector: (l) => [
+    [l === 'fr' ? 'Démo' : 'Demo', 'https://projector-demo.onrender.com'],
+    ['GitHub', 'https://github.com/augustin-bresset/projector'],
+  ],
+  about: (l) => [
+    ['Email', 'mailto:augustin.bresset@polytechnique.edu'],
+    ['GitHub', 'https://github.com/augustin-bresset'],
+    ['LinkedIn', 'https://www.linkedin.com/in/augustin-b-3a0546142/'],
+  ],
+  rubicon: (l) => [],   // client code, never shared publicly — panel stays hidden
 };
 
 export const POIS = {
@@ -123,10 +220,10 @@ export const POIS = {
     },
     ensta: (l) => l === 'fr' ? {
       kicker: 'Recherche · 2024–25', title: 'ENSTA Paris',
-      body: "Stage de recherche en SLAM LiDAR-IMU — mais l'essentiel du temps est parti dans la structure : concevoir l'architecture d'Apairo, le framework qui unifie les datasets robotiques hétérogènes, a pris plus de temps que la recherche elle-même. La graine de tout l'écosystème.",
+      body: "Stage de recherche en SLAM LiDAR-IMU — mais l'essentiel du temps est parti dans la structure : concevoir l'architecture d'Apairo a pris plus de temps que la recherche. La graine de tout l'écosystème.",
     } : {
       kicker: 'Research · 2024–25', title: 'ENSTA Paris',
-      body: "Research internship on LiDAR-IMU SLAM — but most of the time went into the structure: designing Apairo's architecture, the framework that unifies heterogeneous robotics datasets, took longer than the research itself. The seed of the whole ecosystem.",
+      body: "Research internship on LiDAR-IMU SLAM — but most of the time went into the structure: designing Apairo's architecture took longer than the research itself. The seed of the whole ecosystem.",
     },
     enstapfe: (l) => l === 'fr' ? {
       kicker: 'Recherche · PFE · avril–août 2026', title: 'ENSTA Paris — Barakuda',
@@ -164,11 +261,13 @@ export const POIS = {
   apairo: {
     hall: (l) => l === 'fr' ? {
       kicker: 'Open-source · Données robotique', title: 'Apairo',
-      body: "Un écosystème open-source qui unifie les datasets robotiques hétérogènes : des enregistrements bruts aux tenseurs prêts à l'entraînement. Les deux tours sont l'horloge de référence — tous les capteurs, chacun à sa fréquence, alignés sur un même temps.",
+      body: "Un écosystème open-source qui unifie les datasets robotiques hétérogènes — du brut aux tenseurs prêts à l'entraînement. Tout se compose paresseusement, sans rien réécrire sur le disque :",
+      code: CODE_APAIRO,
       links: [['Site ↗', 'https://apairo-robotics.github.io/'], ['GitHub ↗', 'https://github.com/apairo-robotics/apairo']],
     } : {
       kicker: 'Open-source · Robotics data', title: 'Apairo',
-      body: 'An open-source ecosystem that unifies heterogeneous robotics datasets: raw recordings to training-ready tensors. The two towers are the reference clock — every sensor, each at its own rate, aligned onto one time.',
+      body: 'An open-source ecosystem that unifies heterogeneous robotics datasets — from raw to training-ready tensors. Everything composes lazily, nothing rewritten to disk:',
+      code: CODE_APAIRO,
       links: [['Site ↗', 'https://apairo-robotics.github.io/'], ['GitHub ↗', 'https://github.com/apairo-robotics/apairo']],
     },
     extract: (l) => l === 'fr' ? {
@@ -216,10 +315,12 @@ export const POIS = {
     },
     conveyor: (l) => l === 'fr' ? {
       kicker: 'Le voyage des données', title: 'Les Voies',
-      body: "Un paquet de données arrive en rosbag : l'extracteur le décharge, le préprocess le nettoie, puis la synchronisation aligne LiDAR, caméras, IMU et poses — chacun à sa fréquence — sur une même horloge. Les trames hors tolérance sont écartées, jamais maquillées.",
+      body: "Un rosbag arrive : l'extracteur le décharge, le préprocess le nettoie, puis la synchronisation aligne chaque capteur — à sa propre fréquence — sur une même horloge. Les trames hors tolérance sont écartées, jamais maquillées.",
+      figure: FIG_APAIRO_SYNC, caption: 'Quatre flux, un même temps.',
     } : {
       kicker: "The data's journey", title: 'The Lanes',
-      body: 'A data package arrives as a rosbag: the extractor unloads it, preprocessing cleans it, then synchronization aligns lidar, cameras, IMU and poses — each at its own rate — onto one clock. Frames beyond tolerance are set aside, never faked.',
+      body: 'A rosbag arrives: the extractor unloads it, preprocessing cleans it, then synchronization aligns every sensor — each at its own rate — onto one clock. Frames beyond tolerance are set aside, never faked.',
+      figure: FIG_APAIRO_SYNC, caption: 'Four streams, one clock.',
     },
     pier: (l) => l === 'fr' ? {
       kicker: "Né à l'ENSTA · 2024", title: 'Sorti du labo',
@@ -253,11 +354,13 @@ export const POIS = {
     },
     clustering: (l) => l === 'fr' ? {
       kicker: 'Sous le capot', title: 'Segmenters à la carte',
-      body: "Branchez vos propres algorithmes : clustering (K-means, DBSCAN, HDBSCAN), détection de sol (CSF)… jusqu'à des modèles de segmentation, sémantique ou non.",
+      body: "N'importe quel segmenter se branche : il reçoit les points, il rend un label par point. Le reste — sélection, rendu 3D — ne bouge pas.",
+      code: CODE_TOASTER,
       meta: [['Stack', 'Python · Three.js · FastAPI · pywebview']],
     } : {
       kicker: 'Under the hood', title: 'Pluggable Segmenters',
-      body: 'Plug in your own algorithms: clustering (K-means, DBSCAN, HDBSCAN), ground detection (CSF)… up to full segmentation models, semantic or not.',
+      body: 'Any segmenter plugs in: it takes the points, it returns one label per point. Everything else — selection, 3D rendering — stays put.',
+      code: CODE_TOASTER,
       meta: [['Stack', 'Python · Three.js · FastAPI · pywebview']],
     },
   },
@@ -279,12 +382,14 @@ export const POIS = {
     },
     towers: (l) => l === 'fr' ? {
       kicker: 'Conçu pour', title: 'Traversabilité',
-      body: "La tâche phare : marquer cellule par cellule ce qui est franchissable sur la grille vue-du-ciel — la précision dont un robot autonome a besoin pour rouler.",
+      body: "La tâche phare : marquer cellule par cellule ce qui est franchissable — la précision dont un robot a besoin pour choisir sa route.",
+      figure: FIG_SPLASHER_BEV, caption: 'Franchissable, cellule par cellule.',
       meta: [['Stack', 'Python · Three.js · FastAPI']],
       links: [['Démo ↗', 'https://huggingface.co/spaces/SmaugC137/splasher'], ['GitHub ↗', 'https://github.com/augustin-bresset/splasher']],
     } : {
       kicker: 'Built for', title: 'Traversability',
-      body: "The flagship task: mark cell by cell what's drivable on the bird's-eye grid — the precision an autonomous robot needs to move.",
+      body: "The flagship task: mark cell by cell what's drivable — the precision a robot needs to choose its way.",
+      figure: FIG_SPLASHER_BEV, caption: 'Drivable, cell by cell.',
       meta: [['Stack', 'Python · Three.js · FastAPI']],
       links: [['Demo ↗', 'https://huggingface.co/spaces/SmaugC137/splasher'], ['GitHub ↗', 'https://github.com/augustin-bresset/splasher']],
     },
@@ -302,10 +407,12 @@ export const POIS = {
     },
     screens: (l) => l === 'fr' ? {
       kicker: 'Vues parallèles', title: 'La Triple Séance',
-      body: "Trois écrans, un seul capteur ou plusieurs : nuage 3D, caméra 2D, vue du ciel BEV — réglages d'affichage réglés en direct, jamais un aller-retour serveur pendant la lecture.",
+      body: "Trois écrans en phase : nuage 3D, caméra 2D, vue du ciel BEV. Les réglages d'affichage se changent en direct — jamais d'aller-retour serveur pendant la lecture.",
+      figure: FIG_PROJECTOR_SCREENS, caption: '3D · 2D · BEV, en phase.',
     } : {
       kicker: 'Parallel views', title: 'The Triple Bill',
-      body: 'Three screens, any channel: 3D cloud, 2D camera, top-down BEV — display settings tuned live, never a server round-trip during playback.',
+      body: 'Three screens in step: 3D cloud, 2D camera, top-down BEV. Display settings change live — never a server round-trip during playback.',
+      figure: FIG_PROJECTOR_SCREENS, caption: '3D · 2D · BEV, in step.',
     },
     booth: (l) => l === 'fr' ? {
       kicker: 'La séance critique', title: 'Le Guichet des Confusions',

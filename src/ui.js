@@ -1,7 +1,7 @@
 // ui.js — DOM overlay: the field-note slip (pinned beside a landmark), back
 // button, language button, hint. The old centred project modal is gone — notes are
 // small, screen-anchored to the marker the visitor clicked.
-import { LANG, renderNote, cityLabel } from './lang.js';
+import { LANG, renderNote, cityLabel, cityLinks } from './lang.js';
 import { CITY_ACCENT } from './content.js';
 
 export class UI {
@@ -14,6 +14,8 @@ export class UI {
     this.themeBtn = document.getElementById('theme-btn');
     this.hint = document.getElementById('hint');
     this.legend = document.getElementById('legend');
+    this.cityLinksEl = document.getElementById('city-links');
+    this._linksCity = null;      // id of the settlement whose links are shown, or null
     this.helpBtn = document.getElementById('help-btn');
     this.helpModal = document.getElementById('help-modal');
     this.helpTitle = document.getElementById('help-title');
@@ -50,6 +52,38 @@ export class UI {
 
   setLegend(visible) {
     if (this.legend) this.legend.classList.toggle('hidden', !visible);
+  }
+
+  // ── City links panel: the focused settlement's "front doors" (repo, demo, site).
+  // Occupies the legend's top-left slot while in a city (the legend is hidden then).
+  showCityLinks(cityId) {
+    this._linksCity = cityId;
+    this.renderCityLinks();
+  }
+
+  hideCityLinks() {
+    this._linksCity = null;
+    if (this.cityLinksEl) this.cityLinksEl.classList.add('hidden');
+  }
+
+  renderCityLinks() {
+    if (!this.cityLinksEl) return;
+    const id = this._linksCity;
+    const links = id ? cityLinks(id, LANG.current) : [];
+    if (!id || links.length === 0) { this.cityLinksEl.classList.add('hidden'); return; }
+    const [name] = cityLabel(id, LANG.current);
+    const ac = CITY_ACCENT[id] || '#c4763a';
+    const rows = links.map(([label, href]) =>
+      `<a class="citylinks-item" href="${href}" target="_blank" rel="noopener">
+        <span class="citylinks-dot" style="background:${ac}"></span>
+        <span class="citylinks-label">${label}</span>
+        <span class="citylinks-arrow" aria-hidden="true">↗</span>
+      </a>`).join('');
+    this.cityLinksEl.style.setProperty('--accent', ac);
+    this.cityLinksEl.innerHTML =
+      `<div class="citylinks-head"><span class="citylinks-city">${name}</span>` +
+      `<span class="citylinks-title">${LANG.t('linksTitle')}</span></div>${rows}`;
+    this.cityLinksEl.classList.remove('hidden');
   }
 
   // open a note for a landmark; `side` is which side of the marker it sits on
@@ -128,6 +162,7 @@ export class UI {
       this.cardBody.innerHTML = renderNote(this.activeNote.cityId, this.activeNote.poiId, LANG.current);
     }
     this.renderLegend();
+    this.renderCityLinks();     // re-label the focused city's links if the panel is open
     if (this.helpTitle) this.helpTitle.textContent = LANG.t('helpTitle');
     if (this.helpGotIt) this.helpGotIt.textContent = LANG.t('helpGotIt');
     if (this.helpBtn) this.helpBtn.title = LANG.t('helpTitle');

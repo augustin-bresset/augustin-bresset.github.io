@@ -238,6 +238,88 @@ body.theme-sketch #vignette {
   color: var(--ink-light);
 }
 
+/* ── City links (the focused settlement's front doors: repo/demo/site) ──────
+   Takes the legend's top-left slot while in a city (the legend is hidden then). */
+.citylinks {
+  --accent: var(--rust);
+  position: fixed;
+  top: 4.6rem;
+  left: 1.8rem;
+  z-index: 80;
+  background: rgba(237, 228, 210, 0.9);
+  border: 1.5px solid rgba(44, 26, 14, 0.28);
+  border-left: 4px solid var(--accent);
+  backdrop-filter: blur(6px);
+  padding: 0.7rem 0.7rem 0.55rem;
+  width: 188px;
+  box-shadow: 4px 5px 0 rgba(44, 26, 14, 0.12);
+  transition: opacity 0.4s, transform 0.4s;
+}
+.citylinks.hidden {
+  opacity: 0;
+  transform: translateX(-12px);
+  pointer-events: none;
+}
+.citylinks-head {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+  padding: 0 0.35rem 0.5rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(44, 26, 14, 0.14);
+}
+.citylinks-city {
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--ink);
+}
+.citylinks-title {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+}
+.citylinks-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.35rem;
+  text-decoration: none;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.citylinks-item:hover { background: rgba(44, 26, 14, 0.08); }
+.citylinks-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(44, 26, 14, 0.4);
+  box-shadow: 0 0 7px currentColor;
+}
+.citylinks-label {
+  flex: 1 1 auto;
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: 1.12rem;
+  color: var(--ink);
+}
+.citylinks-arrow {
+  flex: 0 0 auto;
+  font-family: 'EB Garamond', serif;
+  font-size: 0.9rem;
+  color: var(--ink-light);
+  transition: transform 0.15s, color 0.15s;
+}
+.citylinks-item:hover .citylinks-arrow {
+  color: var(--accent);
+  transform: translate(1px, -1px);
+}
+
 /* ── Field note (a slip pinned beside a landmark) ─────────────── */
 .note-card {
   --accent: var(--rust);
@@ -356,6 +438,56 @@ body.theme-sketch #vignette {
 }
 .note-link:hover { color: var(--accent); }
 
+/* ── Note code snippet: monospace, ink on a faint paper tint ──── */
+.note-code {
+  margin-top: 0.85rem;
+  padding: 0.65rem 0.75rem;
+  background: rgba(44, 26, 14, 0.055);
+  border: 1px solid rgba(44, 26, 14, 0.14);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.note-code code {
+  font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: var(--ink);
+  white-space: pre;
+}
+.note-code .tok-c { color: var(--ink-light); font-style: italic; }
+
+/* ── Note figure: inline SVG diagram, or a "pinned" framed image ── */
+.note-figure { margin: 0.9rem 0 0; padding: 0; }
+.note-figure svg { display: block; width: 100%; height: auto; }
+.note-figure figcaption {
+  margin-top: 0.35rem;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.66rem;
+  color: var(--ink-light);
+  text-align: center;
+}
+/* framed variant — a photo/crest pinned like a polaroid, tinted to sit on paper */
+.note-figure--framed {
+  width: max-content;
+  max-width: 100%;
+  margin: 0.9rem auto 0.2rem;
+  padding: 0.4rem 0.4rem 0.5rem;
+  background: #fbf8f1;
+  border: 1px solid rgba(44, 26, 14, 0.18);
+  box-shadow: 2px 3px 0 rgba(44, 26, 14, 0.12);
+  transform: rotate(-1.3deg);
+}
+.note-figure--framed img,
+.note-figure--framed svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 120px;
+}
+
 /* ── How-it-works popup (centred, dimmed backdrop) ────────────── */
 .help-modal {
   position: fixed;
@@ -427,8 +559,10 @@ body.theme-sketch #vignette {
 .note-card.note-in .note-kicker { animation: noteRise 0.4s both 0.05s; }
 .note-card.note-in .note-title  { animation: noteRise 0.4s both 0.11s; }
 .note-card.note-in .note-text   { animation: noteRise 0.4s both 0.17s; }
-.note-card.note-in .note-meta   { animation: noteRise 0.4s both 0.23s; }
-.note-card.note-in .note-links  { animation: noteRise 0.4s both 0.27s; }
+.note-card.note-in .note-figure { animation: noteRise 0.4s both 0.21s; }
+.note-card.note-in .note-code   { animation: noteRise 0.4s both 0.25s; }
+.note-card.note-in .note-meta   { animation: noteRise 0.4s both 0.29s; }
+.note-card.note-in .note-links  { animation: noteRise 0.4s both 0.31s; }
 
 @media (prefers-reduced-motion: reduce) {
   .note-card.note-in,
@@ -470,6 +604,14 @@ body.theme-sketch #vignette {
     padding: 0.5rem 0.5rem 0.4rem;
   }
   .legend-name { font-size: 1.05rem; }
+
+  .citylinks {
+    top: 4rem;
+    left: 0.8rem;
+    width: 150px;
+    padding: 0.5rem 0.5rem 0.4rem;
+  }
+  .citylinks-city { font-size: 1.1rem; }
 }
 
 /* Touch devices: finger-sized targets (44px Apple HIG floor) regardless of screen
@@ -481,6 +623,10 @@ body.theme-sketch #vignette {
     font-size: 1rem;
   }
   .legend-item {
+    padding: 0.55rem 0.6rem;
+    min-height: 44px;
+  }
+  .citylinks-item {
     padding: 0.55rem 0.6rem;
     min-height: 44px;
   }

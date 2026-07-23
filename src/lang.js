@@ -2,7 +2,7 @@
 // CONTENT (who Augustin is, projects, path, links) lives in content.js so it can be
 // edited without touching the engine. This file is only chrome: hints, buttons,
 // and turning a content note into HTML.
-import { POIS, CITY_LABELS } from './content.js';
+import { POIS, CITY_LABELS, CITY_LINKS } from './content.js';
 
 export const LANG = {
   current: 'en',
@@ -14,6 +14,7 @@ export const LANG = {
       back: 'Back to the map',
       waveBtn: 'Call airships',
       legendTitle: 'Settlements',
+      linksTitle: 'Links',
       helpTitle: 'How this world works',
       helpGotIt: 'Got it',
       helpItems: [
@@ -31,6 +32,7 @@ export const LANG = {
       back: 'Retour à la carte',
       waveBtn: 'Appeler les vaisseaux',
       legendTitle: 'Les lieux',
+      linksTitle: 'Liens',
       helpTitle: 'Comment ce monde fonctionne',
       helpGotIt: 'Compris',
       helpItems: [
@@ -57,16 +59,45 @@ export function getNote(cityId, poiId, lang) {
   return city[poiId](lang);
 }
 
+// a settlement's "front door" links (main repo, live demo, site…) for the focus-mode
+// side panel. Curated in content.js CITY_LINKS; [] means no public links → panel hidden.
+export function cityLinks(cityId, lang) {
+  const f = CITY_LINKS[cityId];
+  return f ? f(lang) : [];
+}
+
+const HTML_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => HTML_ESC[c]);
+
+// a code snippet, ink-on-paper: escape it, then dim trailing `#` comments. Our
+// snippets are short and hand-written, so the naive comment split is safe enough.
+function renderCode(src) {
+  const body = src.replace(/\n+$/, '').split('\n').map((line) => {
+    const esc = escapeHtml(line);
+    const m = esc.match(/^(.*?)(#.*)$/);
+    return m ? `${m[1]}<span class="tok-c">${m[2]}</span>` : esc;
+  }).join('\n');
+  return `<pre class="note-code"><code>${body}</code></pre>`;
+}
+
+// Field notes are now narrative + (optionally) one evocative element: a `figure`
+// (trusted inline SVG / <img>, authored in content.js) and/or a `code` snippet.
+// External links live in the city-links side panel (see cityLinks + ui.js); any
+// `links` on a note are intentionally not rendered here.
 export function renderNote(cityId, poiId, lang) {
   const n = getNote(cityId, poiId, lang);
   if (!n) return '';
   const meta = (n.meta || []).map(([k, v]) =>
     `<div class="note-meta-row"><span class="note-meta-k">${k}</span><span class="note-meta-v">${v}</span></div>`).join('');
-  const links = (n.links || []).map(([t, h]) =>
-    `<a href="${h}" target="_blank" rel="noopener" class="note-link">${t}</a>`).join('');
+  const figure = n.figure
+    ? `<figure class="note-figure${n.figureFramed ? ' note-figure--framed' : ''}">${n.figure}` +
+      `${n.caption ? `<figcaption>${n.caption}</figcaption>` : ''}</figure>`
+    : '';
+  const code = n.code ? renderCode(n.code) : '';
   return `<span class="note-kicker">${n.kicker}</span>
     <h3 class="note-title">${n.title}</h3>
     <p class="note-text">${n.body}</p>
-    ${meta ? `<div class="note-meta">${meta}</div>` : ''}
-    ${links ? `<div class="note-links">${links}</div>` : ''}`;
+    ${figure}
+    ${code}
+    ${meta ? `<div class="note-meta">${meta}</div>` : ''}`;
 }

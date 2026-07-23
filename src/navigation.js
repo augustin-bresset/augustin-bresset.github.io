@@ -220,6 +220,7 @@ export class Navigation {
     this._applyPoiStates();
     this.ui.setBack(true);
     this.ui.setLegend(false);
+    this.ui.showCityLinks(city.id);   // surface this settlement's front-door links
     this.ui.showHint('cityHint');
     if (this.pendingPoi && this._poiById[this.pendingPoi]) {
       const id = this.pendingPoi; this.pendingPoi = null;
@@ -258,6 +259,7 @@ export class Navigation {
     this.closeNote();
     this.rig.orbitOnly = false;       // back to map-panning
     this.ui.setBack(false);
+    this.ui.hideCityLinks();
     portalRender.clearWallPortal();   // overview discs go back to the plain lift view
     this.activeCity = null;
     this._poiById = {};
@@ -300,6 +302,7 @@ export class Navigation {
 
     this.rig.orbitOnly = false;
     this.ui.setBack(false);
+    this.ui.hideCityLinks();
     this.activeCity = null;
     this._poiById = {};
     this._hoverPoi = null;
