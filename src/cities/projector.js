@@ -163,7 +163,7 @@ export function build() {
   hero.add(box(3.2, 4.2, 0.4, ONYX_LO, { pos: [0, 2.1, 9.2], emissive: 0x0c0a12, emissiveIntensity: 0.3 }));
   for (const dx of [-2.0, 2.0]) hero.add(box(0.6, 4.6, 0.7, GOLD, { pos: [dx, 2.3, 9.2], emissive: GOLD, emissiveIntensity: 0.5, roughness: 0.5, metalness: 0.4 }));
 
-  const label = makeLabel('Projector', 'Multi-Sensor Replay', '#d4af37');
+  const label = makeLabel('Projector', '3D/2D Display Engine', '#d4af37');
   label.sprite.position.set(0, 41, 0); hero.add(label.sprite);
 
   // ===== the stage door — backstage, tucked behind the tower =====================

@@ -12,7 +12,7 @@ export const CITY_LABELS = {
   apairo: (l) => l === 'fr' ? ['Apairo', 'Données Robotique'] : ['Apairo', 'Robotics Data'],
   toaster: (l) => l === 'fr' ? ['Toaster', 'Annotation 3D'] : ['Toaster', '3D Annotation'],
   splasher: (l) => l === 'fr' ? ['Splasher', 'Étiquetage BEV'] : ['Splasher', 'BEV Labeling'],
-  projector: (l) => l === 'fr' ? ['Projector', 'Relecture Multi-Capteurs'] : ['Projector', 'Multi-Sensor Replay'],
+  projector: (l) => l === 'fr' ? ['Projector', "Moteur d'Affichage 3D/2D"] : ['Projector', '3D/2D Display Engine'],
   about: (l) => l === 'fr' ? ['Origin', "L'Inventeur"] : ['Origin', 'The Inventor'],
   rubicon: (l) => l === 'fr' ? ['Rubicon', 'Bijouterie & ERP'] : ['Rubicon', 'Jewelry & ERP'],
 };
@@ -66,11 +66,11 @@ export const POIS = {
     },
     projector: (l) => l === 'fr' ? {
       kicker: 'Montgolfière · Projet', title: 'Projector',
-      body: "Rejoue des séquences robotiques synchronisées, capteur par capteur, en mosaïque d'écrans.",
+      body: "Le moteur d'affichage 3D et 2D partagé — nuages de points et caméras rendus en direct. Il fait tourner l'affichage de Toaster, Splasher et apairo studio.",
       links: [['Démo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
     } : {
       kicker: 'Balloon · Project', title: 'Projector',
-      body: 'Replays synchronized robotics sequences, sensor by sensor, in a mosaic of screens.',
+      body: 'The shared 3D & 2D display engine — point clouds and cameras rendered live. It powers the display in Toaster, Splasher and apairo studio.',
       links: [['Demo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
     },
     rubicon: (l) => l === 'fr' ? {
@@ -200,12 +200,12 @@ export const POIS = {
     },
     visualize: (l) => l === 'fr' ? {
       kicker: 'Brique · Inspection', title: 'Visualize',
-      body: "Ouvre n'importe quel dataset dans une visionneuse 3D synchronisée — nuages de points, images et trajectoires côte à côte, pour vérifier de ses yeux.",
-      links: [['GitHub ↗', 'https://github.com/apairo-robotics/apairo_rr']],
+      body: "Regroupe deux visualiseurs sous un même toit : apairo rerun et apairo studio — nuages de points, images et trajectoires synchronisés côte à côte, pour explorer n'importe quel dataset et le voir de ses propres yeux.",
+      links: [['GitHub ↗', 'https://github.com/apairo-robotics/apairo_visu']],
     } : {
       kicker: 'Brick · Inspection', title: 'Visualize',
-      body: 'Opens any dataset in a synchronized 3D viewer — point clouds, images and trajectories side by side, to check with your own eyes.',
-      links: [['GitHub ↗', 'https://github.com/apairo-robotics/apairo_rr']],
+      body: 'Bundles two viewers under one roof: apairo rerun and apairo studio — point clouds, images and trajectories synced side by side, to explore any dataset and see it with your own eyes.',
+      links: [['GitHub ↗', 'https://github.com/apairo-robotics/apairo_visu']],
     },
     silos: (l) => l === 'fr' ? {
       kicker: 'En aval', title: 'Cache & Découpes',
@@ -292,12 +292,12 @@ export const POIS = {
 
   projector: {
     marquee: (l) => l === 'fr' ? {
-      kicker: 'Viewer · Multi-capteurs', title: 'Projector',
-      body: "Rejoue des séquences robotiques synchronisées, image par image : on scrute la timeline, on dispose les vues en mosaïque, et chaque capteur défile à son propre rythme. Indépendant d'Apairo mais compatible avec ses formats — comme Toaster et Splasher.",
+      kicker: 'Moteur · Affichage 3D/2D', title: 'Projector',
+      body: "Le moteur de rendu qui affiche les données robotiques — nuages de points 3D, caméras 2D, vues du ciel — de façon fluide et synchronisée, réglages en direct. C'est lui qui fait tourner l'affichage de Toaster, Splasher et apairo studio : un seul moteur de rendu, réutilisé partout.",
       links: [['Démo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
     } : {
-      kicker: 'Viewer · Multi-sensor', title: 'Projector',
-      body: 'Replays synchronized robotics sequences, frame by frame: scrub the timeline, dock views into a mosaic, and each sensor plays at its own native rate. Independent from Apairo but Apairo-friendly — like Toaster and Splasher.',
+      kicker: 'Engine · 3D/2D Display', title: 'Projector',
+      body: "The rendering engine that draws robotics data — 3D point clouds, 2D cameras, bird's-eye views — smoothly and in sync, tuned live. It's what powers the display in Toaster, Splasher and apairo studio: one rendering engine, reused everywhere.",
       links: [['Demo ↗', 'https://projector-demo.onrender.com'], ['GitHub ↗', 'https://github.com/augustin-bresset/projector']],
     },
     screens: (l) => l === 'fr' ? {
