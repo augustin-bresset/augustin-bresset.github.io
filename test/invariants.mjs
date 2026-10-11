@@ -11,7 +11,7 @@ import { makeField, WATER_Y } from '../src/gen/heightmap.js';
 import { BIOME, BIOMES, BY_KEY } from '../src/gen/biomes.js';
 
 const SEEDS = [1, 3, 5, 7, 11, 21, 42, 100, 777, 2024];
-const SIZE = 1600, SPACING = 54, N = 192;   // island preset (default mode); N lower for speed
+const SIZE = 2000, SPACING = 54, N = 240;   // island preset (default mode); N lower for speed
 const MODE = 'island';
 const LAND_Y = WATER_Y + 1.0;               // clearly-above-water counts as land
 
@@ -80,7 +80,7 @@ function analyze(seed) {
     for (const n of nb) if (n.biome === BIOME.MOUNTAIN || n.biome === BIOME.SNOW) m++;
     return nb.length ? m / nb.length : 0;
   };
-  const central = volc.filter((s) => Math.hypot(s.x, s.z) < 420);
+  const central = volc.filter((s) => Math.hypot(s.x, s.z) < 520);
   let volcanoInMassif = false;
   if (central.length) {
     let best = 1;

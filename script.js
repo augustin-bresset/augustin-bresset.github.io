@@ -124,7 +124,7 @@ function boot() {
     // slides under the cursor and an exact mesh hit is nearly impossible to land.
     const BALLOON_ACCENT = {
       toast: '#e10600', splash: '#3b82f6', apairo: '#dda42a', gear: '#c4763a',
-      projector: '#d4af37', rubicon: '#a56cc1',
+      projector: '#d4af37', rubicon: '#a56cc1', hubs: '#1f6f5c', foliome: '#e5197d',
     };
     const v = new THREE.Vector3();
     let opened = null;                        // { group, theme } of the open card
@@ -205,9 +205,12 @@ function boot() {
   }
   stage.setCamera(rig.camera);
 
-  // dev camera override (only fires when a param is present): ?pol=&rad=&az=&tx=&tz=&ty=
+  // dev overrides (only fire when a param is present): camera ?pol=&rad=&az=&tx=&tz=&ty=
+  // and ?t=<seconds>, which FREEZES the world's animation clock at that instant — the
+  // way to look at one precise moment of a city's cycle in a headless capture.
+  const num = (k) => (qp.has(k) ? parseFloat(qp.get(k)) : null);
+  const stillT = num('t');
   {
-    const num = (k) => (qp.has(k) ? parseFloat(qp.get(k)) : null);
     const D2R = Math.PI / 180;
     const pol = num('pol'), rad = num('rad'), az = num('az');
     const tx = num('tx'), tz = num('tz'), ty = num('ty');
@@ -249,7 +252,7 @@ function boot() {
 
   stage.onFrame((t, dt) => {
     rig.update(t, dt);
-    for (const u of worldObj.updaters) u(t, dt);
+    for (const u of worldObj.updaters) u(stillT ?? t, dt);
     nav.tick();                       // keep an open field-note pinned to its marker
   });
 

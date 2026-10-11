@@ -488,6 +488,76 @@ body.theme-sketch #vignette {
   max-height: 120px;
 }
 
+/* ── Note editor: an editable landmark's own fields, under its text ──
+   (mounted by the landmark itself — see cities/foliome.js). Paper-and-ink
+   controls; the landmark's accent marks what is active. */
+.note-edit {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(44, 26, 14, 0.14);
+  display: grid;
+  gap: 0.6rem;
+}
+.note-edit-path {
+  justify-self: start;
+  font-family: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  font-size: 0.68rem;
+  color: #fff;
+  background: var(--accent);
+  padding: 0.12rem 0.45rem;
+  border-radius: 3px 3px 3px 0;
+}
+.note-edit-field { display: grid; gap: 0.2rem; }
+.note-edit-field > span,
+.note-edit-order > span:first-child {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.note-edit input,
+.note-edit select,
+.note-edit button {
+  font-family: 'EB Garamond', serif;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: rgba(255, 253, 246, 0.75);
+  border: 1px solid rgba(44, 26, 14, 0.32);
+  border-radius: 3px;
+  padding: 0.3rem 0.5rem;
+}
+.note-edit input,
+.note-edit select { width: 100%; }
+.note-edit button { cursor: pointer; transition: background 0.15s, color 0.15s; }
+.note-edit button:hover:not(:disabled) { background: rgba(44, 26, 14, 0.08); }
+.note-edit button:disabled { opacity: 0.4; cursor: default; }
+.note-edit button.is-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.note-edit button.is-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); }
+.note-edit :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.note-edit-order { display: flex; align-items: center; gap: 0.4rem; }
+.note-edit-order > span:first-child { margin-right: auto; }
+.note-edit-order button { min-width: 2.1rem; line-height: 1; }
+.note-edit-place {
+  min-width: 2.6rem;
+  text-align: right;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-mid);
+}
+.note-edit-bar { display: flex; gap: 0.5rem; }
+.note-edit-bar button { flex: 1; }
+.note-edit-status {
+  margin: 0;
+  min-height: 1.15em;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  line-height: 1.15;
+  color: var(--ink-light);
+}
+
 /* ── How-it-works popup (centred, dimmed backdrop) ────────────── */
 .help-modal {
   position: fixed;
@@ -562,6 +632,7 @@ body.theme-sketch #vignette {
 .note-card.note-in .note-figure { animation: noteRise 0.4s both 0.21s; }
 .note-card.note-in .note-code   { animation: noteRise 0.4s both 0.25s; }
 .note-card.note-in .note-meta   { animation: noteRise 0.4s both 0.29s; }
+.note-card.note-in .note-edit   { animation: noteRise 0.4s both 0.25s; }
 .note-card.note-in .note-links  { animation: noteRise 0.4s both 0.31s; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -638,6 +709,12 @@ body.theme-sketch #vignette {
   .note-link {
     display: inline-block;
     padding: 0.5rem 0.2rem;
+  }
+  .note-edit input,
+  .note-edit select,
+  .note-edit button {
+    min-height: 44px;
+    font-size: 1rem;      /* 16px: no zoom-on-focus on iOS */
   }
 }
 

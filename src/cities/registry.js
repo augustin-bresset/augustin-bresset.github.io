@@ -8,6 +8,8 @@ import { build as buildSplasher } from './splasher.js';
 import { build as buildProjector } from './projector.js';
 import { build as buildAbout } from './about.js';
 import { build as buildRubicon } from './rubicon.js';
+import { build as buildHubs } from './hubs.js';
+import { build as buildFoliome } from './foliome.js';
 
 export const CITIES = [
   {
@@ -45,6 +47,18 @@ export const CITIES = [
     id: 'rubicon', build: buildRubicon, radius: 38,
     affinity: { forest: 1.0, marsh: 0.4, plains: 0.25 },
   },
+  {
+    // Hubs: an open-air odeon where the speakers sit on the steps and one microphone
+    // listens — theatres like this were cut into hillsides, in dry open country
+    id: 'hubs', build: buildHubs, radius: 46,
+    affinity: { hills: 1.0, plains: 0.6, moor: 0.6, savanna: 0.4 },
+  },
+  {
+    // Foliome: an architect's model on its site plan — the tool's demo practice builds
+    // "in the mountains, always", so it likes high, cold ground
+    id: 'foliome', build: buildFoliome, radius: 46,
+    affinity: { taiga: 1.0, moor: 0.7, hills: 0.6, plains: 0.4 },
+  },
 ];
 
 // Desired distance (world units) between linked projects. Smaller = closer.
@@ -64,7 +78,7 @@ export const LINKS = {
 export const LINK_FAR = 460;
 
 // placement order: tightly-linked projects first so the rest arrange around them
-export const PLACE_ORDER = ['toaster', 'splasher', 'projector', 'apairo', 'about', 'rubicon'];
+export const PLACE_ORDER = ['toaster', 'splasher', 'projector', 'apairo', 'about', 'rubicon', 'hubs', 'foliome'];
 
 export function desiredDist(a, b) {
   if (a === b) return 0;

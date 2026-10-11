@@ -69,12 +69,12 @@ export function cityLinks(cityId, lang) {
 const HTML_ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
 const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => HTML_ESC[c]);
 
-// a code snippet, ink-on-paper: escape it, then dim trailing `#` comments. Our
-// snippets are short and hand-written, so the naive comment split is safe enough.
+// a code snippet, ink-on-paper: escape it, then dim trailing `#` or `//` comments.
+// Our snippets are short and hand-written, so the naive comment split is safe enough.
 function renderCode(src) {
   const body = src.replace(/\n+$/, '').split('\n').map((line) => {
     const esc = escapeHtml(line);
-    const m = esc.match(/^(.*?)(#.*)$/);
+    const m = esc.match(/^(.*?)((?:#|\/\/).*)$/);
     return m ? `${m[1]}<span class="tok-c">${m[2]}</span>` : esc;
   }).join('\n');
   return `<pre class="note-code"><code>${body}</code></pre>`;

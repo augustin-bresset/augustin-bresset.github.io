@@ -175,7 +175,7 @@ export function buildCroquis(stage, container, seed) {
   // balloon wears its project's identity in pale pastel: the toast balloon (warm red
   // band, a toast slab swinging under the basket), the splash droplet (cyan, teardrop
   // envelope), the inventor's patchwork (warm amber, a wooden gear hanging).
-  const BALLOON_THEMES = ['toast', 'splash', 'apairo', 'projector', 'rubicon'];
+  const BALLOON_THEMES = ['toast', 'splash', 'apairo', 'projector', 'rubicon', 'hubs', 'foliome'];
   const balloons = [];                 // exposed for click-picking (project cards)
   BALLOON_THEMES.forEach((theme, i) => {
     const brng = mulberry32((seed ^ (0xba1100 * (i + 1))) >>> 0);
@@ -567,6 +567,14 @@ const CRAFT_VARIANTS = {
     { env: 0xdce8d2, band: 0xa56cc1, band2: null,     charm: 'gem', charmCol: 0xb3243c },
     { env: 0xe6dcc8, band: 0x5a8a4c, band2: 0xa56cc1, charm: 'gem', charmCol: 0x2e9e5b },
   ],
+  hubs: [  // Hubs: synced audio — the page's deep green / its mint, a loudspeaker charm
+    { env: 0xe9e6da, band: 0x1f6f5c, band2: null,     charm: 'speaker', charmCol: 0x8a6a4f },
+    { env: 0xdcebe5, band: 0x5fc2a8, band2: 0x1f6f5c, charm: 'speaker', charmCol: 0x6b4a33 },
+  ],
+  foliome: [  // Foliome: the blueline — cool paper, blue ink, the editor's magenta
+    { env: 0xeceff3, band: 0x2a36a8, band2: null,     charm: 'sheet', charmCol: 0xf6f7fa },
+    { env: 0xe3e8f3, band: 0x2a36a8, band2: 0xe5197d, charm: 'sheet', charmCol: 0xf6f7fa },
+  ],
 };
 
 function makeCraft(rng, project) {
@@ -620,6 +628,23 @@ function makeCharm(rng, V, g, y) {
   } else if (V.charm === 'gem') {
     // a hand-cut gem — Rubicon's charm
     charm = outlined(new THREE.OctahedronGeometry(2.6, 0), mat, 0.35, (rng() * 1e9) | 0, g);
+  } else if (V.charm === 'speaker') {
+    // a little loudspeaker — Hubs' charm: a wooden box, two drivers
+    charm = new THREE.Group();
+    outlined(new THREE.BoxGeometry(3.4, 5, 2.6), mat, 0.3, (rng() * 1e9) | 0, charm);
+    const dark = new THREE.MeshLambertMaterial({ color: 0x2a2b2e, flatShading: true });
+    for (const [y, r] of [[1.2, 0.7], [-0.9, 1.15]]) {
+      const cone = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.3, 12), dark);
+      cone.rotation.x = Math.PI / 2; cone.position.set(0, y, 1.35); charm.add(cone);
+    }
+    g.add(charm);
+  } else if (V.charm === 'sheet') {
+    // a framed print — Foliome's charm: white card, blue border
+    charm = new THREE.Group();
+    charm.add(new THREE.Mesh(new THREE.BoxGeometry(5.4, 4.2, 0.3), new THREE.MeshBasicMaterial({ color: 0x2a36a8 })));
+    const face = new THREE.Mesh(new THREE.BoxGeometry(4.7, 3.5, 0.42), mat);
+    charm.add(face);
+    g.add(charm);
   } else {
     charm = new THREE.Group();
     charm.add(new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.7, 6, 8), mat));
@@ -799,6 +824,19 @@ function makeDirigibleCraft(rng, V) {
         new THREE.MeshLambertMaterial({ color: 0x7ba854, flatShading: true }));
       leaf.position.set(dz > 0 ? 0.7 : -0.7, -19, dz); g.add(leaf);
     }
+  } else if (V.charm === 'speaker') {
+    // Hubs: the one microphone, on its stand, riding on top
+    const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.38, 5, 6), wood);
+    stand.position.y = 12.5; g.add(stand);
+    const head = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 2, 3, 8),
+      new THREE.MeshLambertMaterial({ color: 0xb9bdc2, flatShading: true }));
+    head.position.y = 16.6; g.add(head);
+  } else if (V.charm === 'sheet') {
+    // Foliome: the editor's magenta tag, flying from a mast
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 7, 6), wood);
+    mast.position.y = 13; g.add(mast);
+    const tag = new THREE.Mesh(new THREE.BoxGeometry(5.5, 2, 0.2), new THREE.MeshBasicMaterial({ color: 0xe5197d }));
+    tag.position.set(-2.9, 15.4, 0); g.add(tag);
   }
 
   // stern propeller: a great wooden GEAR for the inventor, plain blades otherwise

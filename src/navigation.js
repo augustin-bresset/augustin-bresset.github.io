@@ -18,13 +18,16 @@ export class Navigation {
     this.ray = new THREE.Raycaster();
     this.ndc = new THREE.Vector2();
     this._v = new THREE.Vector3();
+    this._w = new THREE.Vector3();
     this.hovered = null;             // overview: hovered city
     this.state = 'overview';         // 'overview' | 'diving' | 'city'
 
     this.activeCity = null;
     this._poiById = {};
     this._hoverPoi = null;           // city: hovered POI id
+    this._hoverZone = null;          // city: hovered zone inside that POI (see _pick)
     this.openPoiId = null;           // city: open note's POI id
+    this.openZone = null;            // city: the zone the open note is about, if any
     this.openSide = 'right';
     this.pendingPoi = null;          // deep-link ?poi= to open after diving
     this._down = null;
@@ -46,7 +49,9 @@ export class Navigation {
     });
   }
 
-  // raycast the city groups; returns {cityId, portal, poi, portalPoint, portalNormal}.
+  // raycast the city groups; returns {cityId, portal, poi, zone, portalPoint, portalNormal}.
+  // zone         — a landmark may be made of several clickable ZONES (userData.zone on
+  //                each part): the POI then learns which one was hit (see openNote).
   // portalPoint  — world-space hit position on the portal disc surface.
   // portalNormal — world-space face normal of the portal (from userData.portalNormal,
   //                so future portals with custom tilt just set that field).
@@ -59,8 +64,9 @@ export class Navigation {
     this.ray.setFromCamera(this.ndc, this.rig.camera);
     const hits = this.ray.intersectObjects(this.cityGroups, true);
     for (const h of hits) {
-      let o = h.object, cityId = null, portal = false, poi = null, portalNormal = null;
+      let o = h.object, cityId = null, portal = false, poi = null, zone = null, portalNormal = null;
       while (o) {
+        if (o.userData.zone != null && zone == null) zone = o.userData.zone;
         if (o.userData.portal) portal = true;
         if (o.userData.portalNormal && !portalNormal) {
           // Transform the stored local normal to world space via the group's rotation.
@@ -75,13 +81,13 @@ export class Navigation {
       }
       if (cityId || portal || poi) {
         return {
-          cityId, portal, poi,
+          cityId, portal, poi, zone: poi ? zone : null,
           portalPoint:  portal ? h.point.clone() : null,
           portalNormal: portal ? (portalNormal ?? new THREE.Vector3(0, 1, 0)) : null,
         };
       }
     }
-    return { cityId: null, portal: false, poi: null, portalPoint: null, portalNormal: null };
+    return { cityId: null, portal: false, poi: null, zone: null, portalPoint: null, portalNormal: null };
   }
 
   _onMove(e) {
@@ -93,8 +99,13 @@ export class Navigation {
         cursor.cursor = cityId ? 'pointer' : 'grab';
       }
     } else if (this.state === 'city') {
-      const { poi, portal } = this._pick(e);
-      if (poi !== this._hoverPoi) { this._hoverPoi = poi; this._applyPoiStates(); }
+      const { poi, portal, zone } = this._pick(e);
+      if (poi !== this._hoverPoi || zone !== this._hoverZone) {
+        this._poiById[this._hoverPoi]?.hoverZone?.(null);
+        this._hoverPoi = poi; this._hoverZone = zone;
+        this._poiById[poi]?.hoverZone?.(zone);
+        this._applyPoiStates();
+      }
       cursor.cursor = (poi || portal) ? 'pointer' : 'grab';
     }
   }
@@ -108,14 +119,15 @@ export class Navigation {
       const { cityId } = this._pick(e);
       if (cityId) this.diveTo(cityId);
     } else if (this.state === 'city') {
-      const { poi, portal, portalPoint, portalNormal } = this._pick(e);
+      const { poi, portal, zone, portalPoint, portalNormal } = this._pick(e);
       // the portal WINS over a POI: a wall portal lives on a POI-tagged building
       // (the atelier), and diving through it is the more specific intent.
       if (portal) {
         this.portalBack(portalPoint, portalNormal); // Klein-bottle dive through portal
       } else if (poi) {
-        if (poi === this.openPoiId) this.closeNote();
-        else this.openNote(this._poiById[poi]);
+        // clicking the open landmark again closes it — unless it's another of its zones
+        if (poi === this.openPoiId && (zone == null || zone === this.openZone)) this.closeNote();
+        else this.openNote(this._poiById[poi], zone);
       } else if (this.openPoiId) {
         this.closeNote();                        // click empty space dismisses
       }
@@ -123,30 +135,48 @@ export class Navigation {
   }
 
   // ---- field notes -------------------------------------------------------
-  openNote(poi) {
+  // A POI may be EDITABLE in place: `select(zone)` tells it which of its zones the
+  // note is about (it may move its anchor there) and returns the one it settled on;
+  // `mount(el, note)` lets it add its own controls to the note. Plain landmarks have
+  // neither and behave as before.
+  openNote(poi, zone = null) {
     if (!poi) return;
+    if (this.openPoiId && this.openPoiId !== poi.id) this._poiById[this.openPoiId]?.deselect?.();
     this.openPoiId = poi.id;
+    this.openZone = poi.select ? poi.select(zone) : null;
     const p = this._project(poi);
     this.openSide = p.side;
-    this.ui.showNote(this.activeCity.id, poi.id, poi.accent, p.side);
+    this.ui.showNote(this.activeCity.id, poi.id, poi.accent, p.side, poi.mount || null);
     this.ui.positionNote(p.x, p.y, p.side);
     this._applyPoiStates();
   }
 
   closeNote() {
+    this._poiById[this.openPoiId]?.deselect?.();
     this.openPoiId = null;
+    this.openZone = null;
     this.ui.hideNote();
     this._applyPoiStates();
   }
 
-  _project(poi) {
-    this.rig.camera.updateMatrixWorld();     // current view, even pre-first-frame
+  // Screen point the note is pinned to, and the side it opens on (`side` keeps an open
+  // note on the side it first took). A POI with a `reach` (world units) is something
+  // wide that the note must sit BESIDE, not on: the pin moves out to its near edge.
+  _project(poi, side = null) {
+    const cam = this.rig.camera;
+    cam.updateMatrixWorld();                 // current view, even pre-first-frame
     poi.anchor.getWorldPosition(this._v);
-    this._v.project(this.rig.camera);
     const r = this.stage.renderer.domElement.getBoundingClientRect();
-    const x = r.left + (this._v.x * 0.5 + 0.5) * r.width;
-    const y = r.top + (-this._v.y * 0.5 + 0.5) * r.height;
-    const side = x > r.left + r.width * 0.52 ? 'left' : 'right';
+    const sx = (v) => r.left + (v.x * 0.5 + 0.5) * r.width;
+    this._w.copy(this._v).project(cam);
+    let x = sx(this._w);
+    const y = r.top + (-this._w.y * 0.5 + 0.5) * r.height;
+    side = side || (x > r.left + r.width * 0.52 ? 'left' : 'right');
+    if (poi.reach) {
+      this._w.setFromMatrixColumn(cam.matrixWorld, 0);          // the camera's right, in the world
+      this._v.addScaledVector(this._w, poi.reach).project(cam);
+      x += Math.abs(sx(this._v) - x) * (side === 'left' ? -1 : 1);
+    }
     return { x, y, side };
   }
 
@@ -164,7 +194,7 @@ export class Navigation {
     if (this.state !== 'city' || !this.openPoiId) return;
     const poi = this._poiById[this.openPoiId];
     if (!poi) return;
-    const p = this._project(poi);
+    const p = this._project(poi, this.openSide);
     this.ui.positionNote(p.x, p.y, this.openSide);
   }
 
@@ -214,6 +244,7 @@ export class Navigation {
     else portalRender.clearWallPortal();
     this._poiById = Object.fromEntries((city.pois || []).map((p) => [p.id, p]));
     this._hoverPoi = null;
+    this._hoverZone = null;
     this.openPoiId = null;
     this.rig.enabled = true;          // re-enable input after dive animation
     this.rig.orbitOnly = true;        // drag = orbit the settlement (see every façade)
@@ -262,8 +293,10 @@ export class Navigation {
     this.ui.hideCityLinks();
     portalRender.clearWallPortal();   // overview discs go back to the plain lift view
     this.activeCity = null;
+    this._poiById[this._hoverPoi]?.hoverZone?.(null);
     this._poiById = {};
     this._hoverPoi = null;
+    this._hoverZone = null;
     this.state = 'diving';
     this.rig.resetView(1.2);
     // resetView re-enables controls on done; mark overview shortly after
@@ -304,8 +337,10 @@ export class Navigation {
     this.ui.setBack(false);
     this.ui.hideCityLinks();
     this.activeCity = null;
+    this._poiById[this._hoverPoi]?.hoverZone?.(null);
     this._poiById = {};
     this._hoverPoi = null;
+    this._hoverZone = null;
     this.state = 'diving';
 
     const discCenter = portalPoint ?? fallbackTarget;

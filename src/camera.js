@@ -176,7 +176,7 @@ export class CameraRig {
     // view out toward the big terrain's far edge (which fog already hides). All cities
     // are placed inside a slightly smaller disc (see cities/placement.js REACH) so
     // every settlement is reachable by panning.
-    const R = 420;
+    const R = 520;
     const d = Math.hypot(this.target.x, this.target.z);
     if (d > R) {
       const s = R / d;

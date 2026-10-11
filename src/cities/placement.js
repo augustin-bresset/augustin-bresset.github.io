@@ -3,7 +3,7 @@
 // other; others spread. As more projects are added they naturally push outward.
 import { mulberry32 } from '../gen/noise.js';
 import { BIOME, BY_KEY } from '../gen/biomes.js';
-import { PLACE_ORDER, desiredDist } from './registry.js';
+import { PLACE_ORDER, LINK_FAR, desiredDist } from './registry.js';
 
 export function placeCities(field, graph, seed, cities, hydro = null) {
   const rand = mulberry32((seed ^ 0xc17ee5) >>> 0);
@@ -27,13 +27,13 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
   };
 
   // candidate sites: on land, NOT on the volcano cone, and inside the central
-  // REACHABLE disc (radius 380) so every city can be reached by panning — the
-  // camera target is clamped to a 420-radius disc (see camera.js _clampTarget) while
+  // REACHABLE disc (radius 480) so every city can be reached by panning — the
+  // camera target is clamped to a 520-radius disc (see camera.js _clampTarget) while
   // the terrain's far edge sits well past the fog wall, out of reach.
   // Sized generously: on ?mode=floating each city anchors its own flying island
   // (gen/islands.js sizes islands from inter-city spacing), so a cramped disc makes
   // unlinked islands crowd, fuse, or squeeze each other out entirely.
-  const REACH = 380;
+  const REACH = 480;
   const cand = graph.sites.filter((s) => {
     if (s.biome === BIOME.OCEAN || s.biome === BIOME.VOLCANIC) return false;
     if (Math.hypot(s.x, s.z) > REACH) return false;
@@ -53,7 +53,8 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
     return m;
   };
 
-  const placed = {}; // id -> {x,z}
+  const placed = {}; // id -> {x,z,r}
+  const PAD_GAP = 30;
   const result = [];
 
   // affinity may be an array of biome keys (all weight 1) or a weighted map
@@ -73,11 +74,11 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
     if (!city) continue;
     let best = null, bestScore = -Infinity;
     for (const s of cand) {
-      // keep cities from overlapping
+      // keep cities from overlapping: both pads, plus a strip of open land between
       let tooClose = false;
       for (const pid in placed) {
         const p = placed[pid];
-        if (Math.hypot(s.x - p.x, s.z - p.z) < (city.radius + 40)) { tooClose = true; break; }
+        if (Math.hypot(s.x - p.x, s.z - p.z) < city.radius + p.r + PAD_GAP) { tooClose = true; break; }
       }
       if (tooClose) continue;
 
@@ -109,14 +110,17 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
         const p = placed[pid];
         const dist = Math.hypot(s.x - p.x, s.z - p.z);
         const want = desiredDist(id, pid);
-        score -= Math.abs(dist - want) / linkW;
+        // linked pairs aim AT their distance; unlinked ones only have to keep at
+        // least FAR apart. Charging them for being farther too drags each new city
+        // toward the middle of the others once there are many — and bunches them up.
+        score -= (want >= LINK_FAR ? Math.max(0, want - dist) : Math.abs(dist - want)) / linkW;
       }
       // tiny jitter so ties vary per seed
       score += rand() * 0.3;
       if (score > bestScore) { bestScore = score; best = s; }
     }
     if (!best) best = cand[(rand() * cand.length) | 0];
-    placed[id] = { x: best.x, z: best.z };
+    placed[id] = { x: best.x, z: best.z, r: city.radius };
     result.push({ city, x: best.x, z: best.z });
   }
 

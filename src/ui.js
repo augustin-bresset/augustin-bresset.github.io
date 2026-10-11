@@ -1,7 +1,7 @@
 // ui.js — DOM overlay: the field-note slip (pinned beside a landmark), back
 // button, language button, hint. The old centred project modal is gone — notes are
 // small, screen-anchored to the marker the visitor clicked.
-import { LANG, renderNote, cityLabel, cityLinks } from './lang.js';
+import { LANG, renderNote, getNote, cityLabel, cityLinks } from './lang.js';
 import { CITY_ACCENT } from './content.js';
 
 export class UI {
@@ -21,7 +21,7 @@ export class UI {
     this.helpTitle = document.getElementById('help-title');
     this.helpList = document.getElementById('help-list');
     this.helpGotIt = document.getElementById('help-gotit');
-    this.activeNote = null;     // { cityId, poiId, accent }
+    this.activeNote = null;     // { cityId, poiId, accent, mount }
     this._hintKey = 'hint';
     this._legendCities = null;
     this.refreshLang();
@@ -86,10 +86,12 @@ export class UI {
     this.cityLinksEl.classList.remove('hidden');
   }
 
-  // open a note for a landmark; `side` is which side of the marker it sits on
-  showNote(cityId, poiId, accent, side = 'right') {
-    this.activeNote = { cityId, poiId, accent };
-    this.cardBody.innerHTML = renderNote(cityId, poiId, LANG.current);
+  // open a note for a landmark; `side` is which side of the marker it sits on.
+  // `mount(el, note)` — optional: the landmark adds its own controls under the text
+  // (an editable landmark; see navigation.openNote).
+  showNote(cityId, poiId, accent, side = 'right', mount = null) {
+    this.activeNote = { cityId, poiId, accent, mount };
+    this._renderNote();
     this.card.style.setProperty('--accent', accent || '#c4763a');
     this.card.classList.toggle('note-card--left', side === 'left');
     this.card.classList.toggle('note-card--right', side !== 'left');
@@ -114,6 +116,12 @@ export class UI {
     // aim the little pointer notch at the marker
     const notchY = Math.max(20, Math.min(y - top, h - 20));
     this.card.style.setProperty('--notch-y', `${notchY}px`);
+  }
+
+  _renderNote() {
+    const { cityId, poiId, mount } = this.activeNote;
+    this.cardBody.innerHTML = renderNote(cityId, poiId, LANG.current);
+    if (mount) mount(this.cardBody, getNote(cityId, poiId, LANG.current));
   }
 
   hideNote() {
@@ -158,9 +166,7 @@ export class UI {
     if (waveSpan) waveSpan.textContent = LANG.t('waveBtn');
     const hintSpan = this.hint && this.hint.querySelector('[data-key]');
     if (hintSpan) hintSpan.textContent = LANG.t(this._hintKey);
-    if (this.activeNote) {
-      this.cardBody.innerHTML = renderNote(this.activeNote.cityId, this.activeNote.poiId, LANG.current);
-    }
+    if (this.activeNote) this._renderNote();
     this.renderLegend();
     this.renderCityLinks();     // re-label the focused city's links if the panel is open
     if (this.helpTitle) this.helpTitle.textContent = LANG.t('helpTitle');

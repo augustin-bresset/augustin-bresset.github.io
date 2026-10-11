@@ -57,7 +57,7 @@ export function createStage(container) {
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 80;
   sun.shadow.camera.far = 2400;
-  const S = 820;
+  const S = 920;
   sun.shadow.camera.left = -S;
   sun.shadow.camera.right = S;
   sun.shadow.camera.top = S;

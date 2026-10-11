@@ -32,10 +32,13 @@ import { placeCities } from './cities/placement.js';
 //     ocean (the flying island is a way to GENERATE the world, not a theme).
 //   land  (?mode=land) — the much larger endless continent; heavier to load.
 export const WORLD = { size: 1000, half: 500 };
+// `vista` is the radius scale of the ring the home view scans for mountains (see
+// scenicDirection): it follows what the camera can SEE, not how far the land runs,
+// so growing an island to seat more cities doesn't push that ring out into the fog.
 const PRESETS = {
-  island: { size: 1600, half: 800, N: 320 },
-  floating: { size: 1600, half: 800, N: 320, flying: true },
-  land: { size: 2800, half: 1400, N: 512 },
+  island: { size: 2000, half: 1000, N: 368, vista: 800 },
+  floating: { size: 2000, half: 1000, N: 368, vista: 800, flying: true },
+  land: { size: 3000, half: 1500, N: 512, vista: 1400 },
 };
 
 export function buildWorld(stage, seed, { mode = 'island' } = {}) {
@@ -88,7 +91,7 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // only volcanic sites inside the central disc are eligible — a volcano way out in
   // the unreachable backcountry would never be seen (and never reached).
   const volcSites = graph.sites.filter(
-    (s) => s.biome === BIOME.VOLCANIC && Math.hypot(s.x, s.z) < 420
+    (s) => s.biome === BIOME.VOLCANIC && Math.hypot(s.x, s.z) < 520
   );
   const vrand = mulberry32((seed ^ 0x901ca7) >>> 0);
   // the volcano is a RARE landmark — roughly a third of worlds simply don't get one
@@ -164,7 +167,8 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // a plate dropped onto it.
   const CITY_GROUND = {
     apairo: 0xd8d2c2, toaster: 0x3a3f49, splasher: 0x212a36, about: 0xb6a07e,
-    projector: 0x241f2b, rubicon: 0x3a4a2c,
+    projector: 0x241f2b, rubicon: 0x3a4a2c, hubs: 0xb7ab92,
+    foliome: 0xd3d9e4,
   };
   const groundZones = cityPads.map((p) => ({
     x: p.x, z: p.z, r: p.city.radius,
@@ -179,7 +183,7 @@ export function buildWorld(stage, seed, { mode = 'island' } = {}) {
   // 6b. scenic orientation: face the home camera toward the tallest distant terrain
   // (a natural mountain mass) so there are real mountains on the horizon ahead — no
   // bolted-on backdrop, just the generated range, sitting where the camera looks.
-  const scenicAzimuth = scenicDirection(field, cfg.half, islandField) - Math.PI;
+  const scenicAzimuth = scenicDirection(field, cfg.vista, islandField) - Math.PI;
 
   // 7. rivers
   const rivers = buildRivers(hydro, field);
@@ -352,8 +356,8 @@ function clipLinesToIslands(lines, islandField, minLen) {
 // Angle (world XZ) of the tallest distant terrain — sampled on a mid-far ring that
 // sits inside the visible (pre-fog) range, so the home view always opens onto the
 // generated mountains rather than flat plains.
-function scenicDirection(field, half, islandField) {
-  const STEPS = 60, radii = [0.46 * half, 0.62 * half, 0.80 * half];
+function scenicDirection(field, vista, islandField) {
+  const STEPS = 60, radii = [0.46 * vista, 0.62 * vista, 0.80 * vista];
   let bestTh = 0, bestH = -Infinity;
   for (let a = 0; a < STEPS; a++) {
     const th = (a / STEPS) * Math.PI * 2;
