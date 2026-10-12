@@ -43,8 +43,9 @@ export class UI {
     if (!this.legend || !this._legendCities) return;
     const items = this._legendCities.map((c) => {
       const [name, sub] = cityLabel(c.id, LANG.current);
+      const ac = CITY_ACCENT[c.id] || '#c4763a';
       return `<button class="legend-item" data-id="${c.id}">
-        <span class="legend-dot"></span>
+        <span class="legend-dot" style="background:${ac}"></span>
         <span class="legend-text"><span class="legend-name">${name}</span><span class="legend-sub">${sub}</span></span>
       </button>`;
     }).join('');
@@ -76,7 +77,7 @@ export class UI {
     const ac = CITY_ACCENT[id] || '#c4763a';
     const rows = links.map(([label, href]) =>
       `<a class="citylinks-item" href="${href}" target="_blank" rel="noopener">
-        <span class="citylinks-dot"></span>
+        <span class="citylinks-dot" style="background:${ac}"></span>
         <span class="citylinks-label">${label}</span>
         <span class="citylinks-arrow" aria-hidden="true">↗</span>
       </a>`).join('');

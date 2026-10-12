@@ -225,8 +225,8 @@ body.theme-sketch #vignette {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  border: 1.5px solid rgba(44, 26, 14, 0.55);
-  background: rgba(44, 26, 14, 0.14);
+  border: 1.5px solid rgba(44, 26, 14, 0.4);
+  box-shadow: 0 0 7px currentColor;
 }
 .legend-text { display: flex; flex-direction: column; line-height: 1.1; }
 .legend-name {
@@ -302,8 +302,8 @@ body.theme-sketch #vignette {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  border: 1.5px solid rgba(44, 26, 14, 0.55);
-  background: rgba(44, 26, 14, 0.14);
+  border: 1.5px solid rgba(44, 26, 14, 0.4);
+  box-shadow: 0 0 7px currentColor;
 }
 .citylinks-label {
   flex: 1 1 auto;
