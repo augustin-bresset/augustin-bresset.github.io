@@ -1,14 +1,11 @@
-// flying.js (brick) — the FLYING-ISLAND / ARCHIPELAGO geometry: a jagged rocky
-// UNDERSIDE hanging beneath each landmass (its top rim follows the real island edge)
-// and a soft CLOUD SEA the islands float above. Built once and shown/hidden with the
-// mode (the ocean plane is hidden while it's visible).
-//
-// ?mode=floating carves the continent into separate islands (see gen/islands.js) and
-// passes their coastline rims here as opts.islands.rims — one skirt is hung per
-// island. Without that (legacy single flying island) one skirt is sampled around the
-// whole coastline.
+// flying.js (brick) — what makes the archipelago FLOAT (?world=floating, with
+// gen/islands.js): the rock hanging under every island, the roots that trail from its
+// edge, the boulders and islets adrift around it, the lodestones that glow under its
+// keel, and the sea of cloud it all rides above.
 import * as THREE from 'three';
-import { mulberry32 } from '../gen/noise.js';
+import { mulberry32, Simplex, clamp, smoothstep } from '../gen/noise.js';
+import { rockColor } from '../gen/biomes.js';
+import { billboards } from './clouds.js';
 
 function hash2(i, j) {
   let h = (i * 374761393 + j * 668265263) ^ 0x9e3779b9;
@@ -16,298 +13,310 @@ function hash2(i, j) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-const ROCK = new THREE.Color('#6b6157');
-const ROCK_D = new THREE.Color('#40382f');
-const DEEP = new THREE.Color('#2c261f');
-const DIRT = new THREE.Color('#5c4a32');
+const ROCK = new THREE.Color('#756a5d');
+const ROCK_D = new THREE.Color('#463d33');
+const DEEP = new THREE.Color('#2e2821');
+const DIRT = new THREE.Color('#6a5437');
 const MOSS = new THREE.Color('#65763f');
+// (worlds where nothing green trails from a cliff: bare roots there)
+const DRY = new Set(['arid', 'alpine', 'boreal']);
 
-// Four distinct underside profiles — same keel depth, very different silhouettes.
-// 0: smooth taper (default, current behaviour)
-// 1: mushroom — wide top, pinched waist, small flare before keel
-// 2: spire — aggressive straight-down taper for a sharp stalactite look
-// 3: overhang — outward bulge at ~40% depth then rapid taper; dramatic undercut
-function _profileR(u, style) {
-  if (style === 1) {
-    const pinch = Math.max(0, 1 - 5 * Math.abs(u - 0.38));
-    return Math.max(0.04, (1 - u) * (1 - 0.52 * pinch) * (1 + 0.18 * Math.sin(u * Math.PI * 1.1)));
-  } else if (style === 2) {
-    return Math.max(0.04, Math.pow(1 - u, 2.0) * (1 + 0.14 * Math.sin(u * Math.PI)));
-  } else if (style === 3) {
-    return Math.max(0.04, (1 - u) * (1 + 0.72 * Math.sin(u * Math.PI * 1.35)));
-  }
-  return Math.max(0.05, (1 - u) * (1 + 0.28 * Math.sin(u * Math.PI)));
-}
+// THE UNDERSIDE — a second surface on the island's own triangles (so top and bottom
+// share every vertex of the edge: watertight, whatever the outline). How far it hangs
+// goes by how far IN from the edge a point is: a sheer lip at the rim, then tapering to
+// a keel under the middle — deep under a broad island, shallow under an islet — with
+// slow swells and hanging spires on the way down.
+// → { geo, keels: [{ x, y, z, size }] } (the lowest point of each island)
+function buildUnderside(field, isl, seed) {
+  const { N, verts, heights, idx, size, blendIds, blendW } = field;
+  const { px, pz, tris, used, edge, comp, comps } = isl;
+  const n = verts * verts, cell = size / N;
+  const sim = new Simplex((seed ^ 0x0de5) >>> 0);
 
-// Build one island's rocky underside: rings from the coast rim (following the real
-// terrain-edge height) tapering down to a keel, jagged with cheap hashed noise.
-function makeSkirt(field, cx, cz, rim, depth, seed, profStyle = 0) {
-  const SEG = rim.length;
-  const RINGS = 15;
-  const rand = seed;
-  const profileR = (u) => _profileR(u, profStyle);
-  const easeU = (u) => Math.pow(u, 1.3);
-
-  // top ring follows the real terrain height at the island edge (legacy single-island
-  // path only — the archipelago now uses the grid-exact buildUnderside below).
-  const topY = [];
-  for (let a = 0; a < SEG; a++) {
-    const th = (a / SEG) * Math.PI * 2;
-    const ex = cx + Math.cos(th) * rim[a], ez = cz + Math.sin(th) * rim[a];
-    topY.push(Math.max(1.0, field.heightAt(ex, ez)));
-  }
-
-  const H = [], X = [], Z = [];
-  for (let ri = 0; ri <= RINGS; ri++) {
-    const u = ri / RINGS;
-    const hr = [], xr = [], zr = [];
-    for (let ai = 0; ai <= SEG; ai++) {
-      const a = ai % SEG;
-      const th = (ai / SEG) * Math.PI * 2;
-      const jag = (hash2((rand + ri) | 0, a) - 0.5);
-      const rr = rim[a] * profileR(u) * (1 + jag * 0.16 * u);
-      const y = topY[a] * (1 - easeU(u)) + (-depth) * easeU(u) + jag * 24 * u * (1 - u);
-      hr.push(y);
-      xr.push(cx + Math.cos(th) * rr);
-      zr.push(cz + Math.sin(th) * rr);
-    }
-    H.push(hr); X.push(xr); Z.push(zr);
-  }
-
-  const triCount = RINGS * SEG * 2;
-  const positions = new Float32Array(triCount * 9);
-  const colors = new Float32Array(triCount * 9);
-  const col = new THREE.Color();
-  let o = 0;
-  const emit = (ax, ay, az, bx, by, bz, cx2, cy, cz2, ri, ai) => {
-    const my = (ay + by + cy) / 3;
-    if (my > -18) col.copy(DIRT).lerp(MOSS, hash2(ri, ai) * 0.5);
-    else col.copy(ROCK).lerp(ROCK_D, Math.min(1, (-my) / 160));
-    if (my < -170) col.lerp(DEEP, Math.min(1, (-my - 170) / 160));
-    col.offsetHSL(0, 0, (hash2(ri * 3, ai) - 0.5) * 0.06);
-    positions[o] = ax; positions[o + 1] = ay; positions[o + 2] = az;
-    positions[o + 3] = bx; positions[o + 4] = by; positions[o + 5] = bz;
-    positions[o + 6] = cx2; positions[o + 7] = cy; positions[o + 8] = cz2;
-    for (let v = 0; v < 3; v++) { colors[o + v * 3] = col.r; colors[o + v * 3 + 1] = col.g; colors[o + v * 3 + 2] = col.b; }
-    o += 9;
+  // distance in from the edge: two sweeps of a chamfer transform (round, where a
+  // step-by-step flood would give diamonds)
+  const dist = new Float32Array(n).fill(1e6);
+  for (let k = 0; k < n; k++) if (!used[k] || edge(k)) dist[k] = 0;
+  const relax = (k, i, j, di, dj, w) => {
+    const ni = i + di, nj = j + dj;
+    if (ni < 0 || nj < 0 || ni > N || nj > N) return;
+    const d = dist[idx(ni, nj)] + w;
+    if (d < dist[k]) dist[k] = d;
   };
-  for (let ri = 0; ri < RINGS; ri++) {
-    for (let ai = 0; ai < SEG; ai++) {
-      const x00 = X[ri][ai], z00 = Z[ri][ai], y00 = H[ri][ai];
-      const x10 = X[ri][ai + 1], z10 = Z[ri][ai + 1], y10 = H[ri][ai + 1];
-      const x01 = X[ri + 1][ai], z01 = Z[ri + 1][ai], y01 = H[ri + 1][ai];
-      const x11 = X[ri + 1][ai + 1], z11 = Z[ri + 1][ai + 1], y11 = H[ri + 1][ai + 1];
-      emit(x00, y00, z00, x10, y10, z10, x01, y01, z01, ri, ai);
-      emit(x10, y10, z10, x11, y11, z11, x01, y01, z01, ri, ai);
-    }
+  for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+    const k = idx(i, j);
+    if (!dist[k]) continue;
+    relax(k, i, j, -1, 0, 1); relax(k, i, j, 0, -1, 1); relax(k, i, j, -1, -1, 1.414); relax(k, i, j, 1, -1, 1.414);
+  }
+  for (let j = N; j >= 0; j--) for (let i = N; i >= 0; i--) {
+    const k = idx(i, j);
+    if (!dist[k]) continue;
+    relax(k, i, j, 1, 0, 1); relax(k, i, j, 0, 1, 1); relax(k, i, j, 1, 1, 1.414); relax(k, i, j, -1, 1, 1.414);
+  }
+  for (const c of comps) c.inMax = 0;
+  for (let k = 0; k < n; k++) if (used[k]) { const c = comps[comp[k]]; if (dist[k] * cell > c.inMax) c.inMax = dist[k] * cell; }
+
+  const bottom = new Float32Array(n);
+  const keels = comps.map(() => null);
+  for (let k = 0; k < n; k++) {
+    if (!used[k]) continue;
+    const c = comps[comp[k]], x = px[k], z = pz[k], into = dist[k] * cell;
+    const depth = clamp(c.inMax * 1.25 + 26, 34, 300);
+    const u = clamp(into / (c.inMax || 1), 0, 1), inside = Math.min(1, into / 26);
+    const lip = Math.min(depth * 0.3, 24) * smoothstep(0, cell * 2.4, into);
+    let dive = lip + (depth - lip) * Math.pow(u, 0.85);
+    dive *= 1 + inside * 0.34 * sim.noise2D(x * 0.011 + 4, z * 0.011 - 6);
+    // (a few great fangs, and a fringe of small ones)
+    const fang = Math.max(0, sim.noise2D(x * 0.021 + 50, z * 0.021 + 9) - 0.42) / 0.58;
+    const tooth = Math.max(0, sim.noise2D(x * 0.06 - 17, z * 0.06 + 31) - 0.5) / 0.5;
+    dive += inside * depth * (0.55 * fang * Math.sqrt(fang) + 0.14 * tooth);
+    dive += (hash2((k % verts) * 7 + (seed & 1023), ((k / verts) | 0) * 13) - 0.5) * 18 * inside;
+    bottom[k] = heights[k] - Math.max(0, dive);
+    if (!keels[c.id] || bottom[k] < keels[c.id].y) keels[c.id] = { x, y: bottom[k], z, size: c.inMax };
+  }
+
+  const count = tris.length / 3;
+  const positions = new Float32Array(count * 9), colors = new Float32Array(count * 9);
+  const col = new THREE.Color(), stone = new THREE.Color();
+  for (let f = 0, o = 0; f < count; f++, o += 9) {
+    // (the top's triangle, turned over)
+    const ka = tris[f * 3], kb = tris[f * 3 + 2], kc = tris[f * 3 + 1];
+    positions[o] = px[ka]; positions[o + 1] = bottom[ka]; positions[o + 2] = pz[ka];
+    positions[o + 3] = px[kb]; positions[o + 4] = bottom[kb]; positions[o + 5] = pz[kb];
+    positions[o + 6] = px[kc]; positions[o + 7] = bottom[kc]; positions[o + 8] = pz[kc];
+    const my = (bottom[ka] + bottom[kb] + bottom[kc]) / 3, below = (heights[ka] + heights[kb] + heights[kc]) / 3 - my;
+    // the country's own stone (red under a mesa, black under a volcano), laid in
+    // strata; earth and moss just under the turf, darker the deeper it hangs
+    rockColor(stone, blendIds, blendW, ka * 3);
+    col.copy(ROCK).lerp(stone, 0.5);
+    const band = Math.sin(my * 0.17 + 2.4 * sim.noise2D(px[ka] * 0.004, pz[ka] * 0.004));
+    col.offsetHSL(0, 0, band > 0.35 ? 0.05 : band < -0.55 ? -0.04 : 0);
+    col.lerp(ROCK_D, Math.min(0.62, below / 230));
+    if (below > 170) col.lerp(DEEP, Math.min(1, (below - 170) / 150));
+    if (below < 9) col.copy(DIRT).lerp(MOSS, hash2(ka, 3) * 0.55);
+    col.offsetHSL(0, 0, (hash2(ka * 3, f) - 0.5) * 0.05);
+    for (let v = 0; v < 3; v++) { colors[o + v * 3] = col.r; colors[o + v * 3 + 1] = col.g; colors[o + v * 3 + 2] = col.b; }
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  return geo;
+  return { geo, keels: keels.filter(Boolean) };
 }
 
-// GRID-EXACT UNDERSIDE — the clean solution. Instead of hanging a separate radial
-// skirt and trying to make its polygon meet the jagged per-cell terrain edge (it
-// never can: gaps, flicker, and whole concave lobes left with terrain but nothing
-// underneath), the underside is a SECOND SURFACE BUILT ON THE SAME GRID as the
-// terrain: every visible cell gets a bottom quad, and boundary vertices reuse the
-// terrain's own heights — top and bottom share their rim vertices EXACTLY, so the
-// island is watertight by construction, whatever its shape.
-// Depth grows with distance-to-edge (BFS over the island's vertices), so small
-// lobes stay thin and big masses grow deep keels; hashed jitter keeps it rocky.
-function buildUnderside(field, cellVisible, seed) {
-  const { N, verts, heights, idx, gx, gz, size } = field;
-  const n = verts * verts;
+// what drifts in the air rides up and down, each thing in its own time (after its place
+// in the world is known: `aRide` = phase, reach)
+function riding(material, uTime) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec2 aRide;\nuniform float uTime;')
+      .replace('#include <project_vertex>', `
+        vec4 mvPosition = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          mvPosition = instanceMatrix * mvPosition;
+        #endif
+        mvPosition.y += sin(uTime * 0.45 + aRide.x) * aRide.y;
+        mvPosition = modelViewMatrix * mvPosition;
+        gl_Position = projectionMatrix * mvPosition;`);
+  };
+  return material;
+}
 
-  // how many visible cells touch each vertex (0 = not on an island, 4 = interior)
-  const touch = new Uint8Array(n);
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      if (!cellVisible(i, j)) continue;
-      touch[idx(i, j)]++; touch[idx(i + 1, j)]++;
-      touch[idx(i, j + 1)]++; touch[idx(i + 1, j + 1)]++;
+// a lump of rock with a turfed top: the body of an islet (unit size, top at y = 0)
+function isletGeometry(rand) {
+  const SEG = 7, pos = [], colr = [];
+  const grass = new THREE.Color('#7f9a4c'), col = new THREE.Color();
+  const ring = (r, y, jag) => Array.from({ length: SEG }, (_, s) => {
+    const a = (s / SEG) * Math.PI * 2, rr = r * (1 + (rand() - 0.5) * jag);
+    return [Math.cos(a) * rr, y + (rand() - 0.5) * jag * 0.3, Math.sin(a) * rr];
+  });
+  const top = ring(1, 0, 0.3), mid = ring(0.74, -0.55, 0.5), low = ring(0.34, -1.25, 0.6), tip = [0.06, -1.9, -0.04];
+  const tri = (a, b, c, color) => { pos.push(...a, ...b, ...c); for (let v = 0; v < 3; v++) colr.push(color.r, color.g, color.b); };
+  for (let s = 0; s < SEG; s++) {
+    const t = (s + 1) % SEG;
+    tri([0, 0.12, 0], top[t], top[s], col.copy(grass).offsetHSL(0, 0, (rand() - 0.5) * 0.06));
+    for (const [up, down, shade] of [[top, mid, 0], [mid, low, 0.4]]) {
+      col.copy(ROCK).lerp(ROCK_D, shade + rand() * 0.3);
+      tri(up[s], up[t], down[s], col); tri(up[t], down[t], down[s], col);
     }
-  }
-
-  // BFS distance (in vertices) from the island boundary
-  const dist = new Float32Array(n).fill(-1);
-  const qi = [], qj = [];
-  let head = 0;
-  for (let j = 0; j <= N; j++) {
-    for (let i = 0; i <= N; i++) {
-      const k = idx(i, j);
-      if (touch[k] > 0 && (touch[k] < 4 || i === 0 || j === 0 || i === N || j === N)) {
-        dist[k] = 0; qi.push(i); qj.push(j);
-      }
-    }
-  }
-  while (head < qi.length) {
-    const i = qi[head], j = qj[head]; head++;
-    const d = dist[idx(i, j)];
-    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const ni = i + di, nj = j + dj;
-      if (ni < 0 || nj < 0 || ni > N || nj > N) continue;
-      const nk = idx(ni, nj);
-      if (touch[nk] > 0 && dist[nk] < 0) { dist[nk] = d + 1; qi.push(ni); qj.push(nj); }
-    }
-  }
-
-  // per-vertex bottom height: equals the TOP height at the boundary (exact seam),
-  // then dives with distance — saturating so big islands get deep keels and thin
-  // lobes stay shallow. Jitter fades to zero at the seam.
-  const cellW = size / N;
-  const bottomY = new Float32Array(n);
-  for (let j = 0; j <= N; j++) {
-    for (let i = 0; i <= N; i++) {
-      const k = idx(i, j);
-      if (touch[k] === 0) continue;
-      const dw = Math.max(0, dist[k]) * cellW;
-      const t = Math.min(1, dw / 42);
-      const dive = 275 * (1 - Math.exp(-dw / 80));
-      const jag = (hash2(i * 7 + seed, j * 13) - 0.5) * 44 * t;
-      bottomY[k] = heights[k] - Math.max(0, dive + jag);
-    }
-  }
-
-  // emit one downward-facing quad per visible cell (reversed winding vs the top)
-  let cellCount = 0;
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (cellVisible(i, j)) cellCount++;
-  const positions = new Float32Array(cellCount * 2 * 9);
-  const colors = new Float32Array(cellCount * 2 * 9);
-  const col = new THREE.Color();
-  let o = 0;
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      if (!cellVisible(i, j)) continue;
-      const x0 = gx(i), x1 = gx(i + 1), z0 = gz(j), z1 = gz(j + 1);
-      const y00 = bottomY[idx(i, j)], y10 = bottomY[idx(i + 1, j)];
-      const y01 = bottomY[idx(i, j + 1)], y11 = bottomY[idx(i + 1, j + 1)];
-      // reversed order → normals face down/outward
-      const tris = [
-        [x0, y00, z0, x1, y10, z0, x0, y01, z1],
-        [x1, y10, z0, x1, y11, z1, x0, y01, z1],
-      ];
-      for (const [ax, ay, az, bx, by, bz, cx2, cy, cz2] of tris) {
-        const my = (ay + by + cy) / 3;
-        const dTop = (heights[idx(i, j)] - my);        // how far below the surface
-        if (dTop < 12) col.copy(DIRT).lerp(MOSS, hash2(i, j) * 0.5);
-        else col.copy(ROCK).lerp(ROCK_D, Math.min(1, dTop / 170));
-        if (dTop > 180) col.lerp(DEEP, Math.min(1, (dTop - 180) / 160));
-        col.offsetHSL(0, 0, (hash2(i * 3, j) - 0.5) * 0.06);
-        positions[o] = ax; positions[o + 1] = ay; positions[o + 2] = az;
-        positions[o + 3] = bx; positions[o + 4] = by; positions[o + 5] = bz;
-        positions[o + 6] = cx2; positions[o + 7] = cy; positions[o + 8] = cz2;
-        for (let v = 0; v < 3; v++) {
-          colors[o + v * 3] = col.r; colors[o + v * 3 + 1] = col.g; colors[o + v * 3 + 2] = col.b;
-        }
-        o += 9;
-      }
-    }
+    tri(low[s], low[t], tip, col.copy(ROCK_D).lerp(DEEP, rand() * 0.6));
   }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
   geo.computeVertexNormals();
   return geo;
 }
 
-export function buildFlying(field, half, seed, opts = {}) {
+// islands: gen/islands.js buildIslandField · trend: the world's climate
+export function buildFlying(field, half, seed, { islands, trend = 'balanced' }) {
   const group = new THREE.Group();
   group.name = 'flying';
   const rand = mulberry32((seed ^ 0xf1a1) >>> 0);
-  const rockMat = new THREE.MeshStandardMaterial({
-    vertexColors: true, flatShading: true, roughness: 1, metalness: 0,
-    // double-sided: looking up from under an island must never reveal see-through
-    // interior faces where the collar meets the terrain
-    side: THREE.DoubleSide,
-  });
+  const uTime = { value: 0 };
+  const o3 = new THREE.Object3D(), col = new THREE.Color();
 
-  // --- 1. rocky undersides ---
-  const islands = opts.islands && opts.islands.rims && opts.islands.rims.length
-    ? opts.islands.rims
-    : null;
+  // ---- 1. the rock under the islands ----
+  const under = buildUnderside(field, islands, seed);
+  const underside = new THREE.Mesh(under.geo, new THREE.MeshStandardMaterial({
+    // (double-sided: from under an island nothing may ever be seen through)
+    vertexColors: true, flatShading: true, roughness: 1, metalness: 0, side: THREE.DoubleSide,
+  }));
+  underside.name = 'flying-underside';
+  underside.receiveShadow = true;
+  group.add(underside);
 
-  if (opts.islands && opts.islands.cellVisible) {
-    // archipelago: ONE grid-exact underside covering every visible cell — top and
-    // bottom share their boundary vertices, so there is no seam to tune and no
-    // lobe can end up with terrain but nothing underneath.
-    const geo = buildUnderside(field, opts.islands.cellVisible, (seed & 1023));
-    const m = new THREE.Mesh(geo, rockMat);
-    m.name = 'flying-underside';
-    group.add(m);
-  } else if (islands) {
-    // legacy per-rim skirts (kept for callers without a cell mask)
-    let s = 0;
-    for (const isl of islands) {
-      const depth = 150 + (isl.R || 160) * 0.75;
-      const skirtSeed = (seed ^ (0x51 * (s + 1))) >>> 0;
-      const profStyle = ((seed ^ (0xf7 * (s + 3))) >>> 0) % 4;
-      const geo = makeSkirt(field, isl.x, isl.z, isl.rim, depth, skirtSeed, profStyle);
-      const m = new THREE.Mesh(geo, rockMat);
-      m.name = 'flying-underside';
-      group.add(m);
-      s++;
+  const rims = islands.comps.flatMap((c) => c.rim);
+  const inAir = (x, z, clear = 4) => !islands.atWorld(x, z, -clear);
+
+  // ---- 2. roots and creepers trailing from the edge ----
+  {
+    const strip = [];
+    for (const turn of [0, Math.PI / 2]) {
+      const g = new THREE.PlaneGeometry(1, 1, 1, 4).translate(0, -0.5, 0);
+      const p = g.attributes.position;
+      for (let v = 0; v < p.count; v++) p.setX(v, p.getX(v) * (1 - 0.85 * -p.getY(v)));      // it tapers to its tip
+      strip.push(g.rotateY(turn).toNonIndexed());
     }
-  } else {
-    // legacy single flying island: sample the whole coastline as one rim
-    const SEG = 84, maxR = half * 0.95, rim = [];
-    for (let a = 0; a < SEG; a++) {
-      const th = (a / SEG) * Math.PI * 2;
-      const cx = Math.cos(th), cz = Math.sin(th);
-      let r = 60;
-      for (let rr = maxR; rr > 40; rr -= 10) {
-        if (field.heightAt(cx * rr, cz * rr) > 1.5) { r = rr + 8; break; }
+    const pos = [...strip[0].attributes.position.array, ...strip[1].attributes.position.array];
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, side: THREE.DoubleSide, flatShading: true });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = uTime;
+      // (it swings from where it is rooted, the tip the most)
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          float hang = position.y * position.y;
+          transformed.x += sin(uTime * 1.1 + instanceMatrix[3][0] * 0.31 + instanceMatrix[3][2] * 0.17) * 0.5 * hang;
+          transformed.z += cos(uTime * 0.8 + instanceMatrix[3][2] * 0.29) * 0.35 * hang;`);
+    };
+    const picks = rims.filter(() => rand() < 0.3);
+    const roots = new THREE.InstancedMesh(geo, mat, picks.length);
+    const tones = DRY.has(trend) ? ['#6b5136', '#7d6243', '#584330'] : ['#4f6b33', '#5d7a3a', '#3f5a2c', '#6b5136'];
+    picks.forEach((p, i) => {
+      const w = 0.7 + rand() * 1.5;
+      o3.position.set(p.x + p.nx * 0.5, p.y - 0.2, p.z + p.nz * 0.5);
+      o3.rotation.set(0, rand() * Math.PI, 0);
+      o3.scale.set(w, 4 + rand() * rand() * 26, w);
+      o3.updateMatrix();
+      roots.setMatrixAt(i, o3.matrix);
+      roots.setColorAt(i, col.set(tones[(rand() * tones.length) | 0]).offsetHSL(0, 0, (rand() - 0.5) * 0.08));
+    });
+    roots.name = 'roots'; roots.raycast = () => {};
+    group.add(roots);
+  }
+
+  // ---- 3. what has broken off and drifts alongside: boulders, and a few islets with
+  // a tree or two still standing on them ----
+  {
+    const boulder = new THREE.IcosahedronGeometry(1, 0);
+    const n = Math.min(170, Math.round(rims.length * 0.05)), rides = new Float32Array(n * 2);
+    const rocks = new THREE.InstancedMesh(boulder, riding(new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }), uTime), n);
+    for (let i = 0; i < n; i++) {
+      let x = 0, y = 0, z = 0;
+      for (let tries = 0; tries < 12; tries++) {
+        const p = rims[(rand() * rims.length) | 0], out = 7 + rand() * rand() * 80, slip = (rand() - 0.5) * 30;
+        x = p.x + p.nx * out - p.nz * slip; z = p.z + p.nz * out + p.nx * slip;
+        y = p.y - 6 - rand() * 120 + (rand() < 0.2 ? 30 * rand() : 0);
+        if (inAir(x, z, 5)) break;
       }
-      rim.push(r);
+      const s = 1 + rand() * rand() * 6.5;
+      o3.position.set(x, y, z);
+      o3.rotation.set(rand() * 6.28, rand() * 6.28, rand() * 6.28);
+      o3.scale.set(s * (0.7 + rand() * 0.6), s * (0.8 + rand() * 0.9), s * (0.7 + rand() * 0.6));
+      o3.updateMatrix();
+      rocks.setMatrixAt(i, o3.matrix);
+      rocks.setColorAt(i, col.copy(ROCK).lerp(ROCK_D, rand() * 0.7));
+      rides[i * 2] = rand() * 6.28; rides[i * 2 + 1] = 0.5 + rand() * 1.1;
     }
-    const geo = makeSkirt(field, 0, 0, rim, 260 + half * 0.35, seed >>> 0);
-    const m = new THREE.Mesh(geo, rockMat);
-    m.name = 'flying-underside';
-    group.add(m);
+    boulder.setAttribute('aRide', new THREE.InstancedBufferAttribute(rides, 2));
+    rocks.name = 'drift-rocks'; rocks.raycast = () => {}; rocks.frustumCulled = false;
+    group.add(rocks);
+
+    const spots = [];
+    for (let tries = 0; tries < 900 && spots.length < 14; tries++) {
+      const a = rand() * 6.28, r = 120 + rand() * 780, x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (!inAir(x, z, 32) || inAir(x, z, 170) || spots.some((s) => Math.hypot(s.x - x, s.z - z) < 80)) continue;
+      spots.push({ x, z, y: field.liftAt(x, z) + 8 + (rand() - 0.62) * 80, r: 8 + rand() * rand() * 15, turn: rand() * 6.28, ride: [rand() * 6.28, 0.9 + rand() * 1.3] });
+    }
+    const body = isletGeometry(rand), crown = new THREE.ConeGeometry(1, 2.6, 6).translate(0, 2.1, 0), trunk = new THREE.CylinderGeometry(0.16, 0.22, 1, 5).translate(0, 0.5, 0);
+    const lumps = new THREE.InstancedMesh(body, riding(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 }), uTime), spots.length);
+    const stand = [];
+    spots.forEach((s, i) => {
+      o3.position.set(s.x, s.y, s.z); o3.rotation.set(0, s.turn, 0); o3.scale.set(s.r, s.r * (0.9 + rand() * 0.7), s.r); o3.updateMatrix();
+      lumps.setMatrixAt(i, o3.matrix);
+      if (DRY.has(trend) && rand() < 0.6) return;
+      for (let t = 0, many = 1 + ((rand() * Math.min(4, s.r / 4)) | 0); t < many; t++) {
+        const a = rand() * 6.28, d = rand() * s.r * 0.55;
+        stand.push({ x: s.x + Math.cos(a) * d, y: s.y + 0.1, z: s.z + Math.sin(a) * d, size: 1.3 + rand() * 1.5, ride: s.ride });
+      }
+    });
+    body.setAttribute('aRide', new THREE.InstancedBufferAttribute(new Float32Array(spots.flatMap((s) => s.ride)), 2));
+    lumps.name = 'drift-islets'; lumps.raycast = () => {}; lumps.frustumCulled = false; lumps.receiveShadow = true;
+    group.add(lumps);
+    if (stand.length) {
+      const rides = new Float32Array(stand.flatMap((s) => s.ride));
+      const leaves = ['#3f6b3a', '#4d7a3c', '#35603a', '#5a8442'];
+      const parts = [[crown, (s) => col.set(leaves[(rand() * leaves.length) | 0])], [trunk, () => col.set('#5c4630')]];
+      for (const [geo, tint] of parts) {
+        const mesh = new THREE.InstancedMesh(geo, riding(new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }), uTime), stand.length);
+        stand.forEach((s, i) => {
+          o3.position.set(s.x, s.y, s.z); o3.rotation.set(0, i * 2.4, 0); o3.scale.setScalar(s.size); o3.updateMatrix();
+          mesh.setMatrixAt(i, o3.matrix); mesh.setColorAt(i, tint(s));
+        });
+        geo.setAttribute('aRide', new THREE.InstancedBufferAttribute(rides, 2));
+        mesh.raycast = () => {}; mesh.frustumCulled = false;
+        group.add(mesh);
+      }
+    }
   }
 
-  // --- 2. cloud sea: soft sprites filling the sky below/between the islands ---
-  const tex = makeCloudTexture();
-  const bank = new THREE.Group();
-  const N = islands ? 300 : 240;
-  const spreadR = half * (islands ? 1.7 : 2.0);
-  for (let i = 0; i < N; i++) {
-    const th = rand() * Math.PI * 2;
-    const rr = Math.pow(rand(), 0.5) * spreadR;
-    const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false,
-      opacity: 0.42 + rand() * 0.42, color: 0xffffff, fog: true });
-    const sp = new THREE.Sprite(m);
-    const w = 220 + rand() * 420;
-    sp.scale.set(w, w * 0.58, 1);
-    // sit well below the island bases, with a few higher wisps threading the gaps
-    const low = -70 - rand() * 190;
-    const wisp = -8 - rand() * 30;
-    sp.position.set(Math.cos(th) * rr, rand() < 0.22 ? wisp : low, Math.sin(th) * rr);
-    bank.add(sp);
+  // ---- 4. the lodestones: what holds an island up, glowing under its keel ----
+  {
+    const big = under.keels.filter((k) => k.size > 40);
+    const gem = new THREE.OctahedronGeometry(1, 0).scale(0.42, 1.5, 0.42);
+    const stones = new THREE.InstancedMesh(gem, new THREE.MeshStandardMaterial({ color: 0x9fe6df, emissive: 0x4fd6c8, emissiveIntensity: 1.7, flatShading: true, roughness: 0.3 }), big.length * 3);
+    big.forEach((k, i) => {
+      const s = clamp(k.size / 16, 3.4, 9);
+      for (let g = 0; g < 3; g++) {
+        const a = g * 2.1 + i, off = g ? s * 0.55 : 0, sg = g ? s * 0.55 : s;
+        o3.position.set(k.x + Math.cos(a) * off, k.y + sg * 0.3 + (g ? s * 0.5 : 0), k.z + Math.sin(a) * off);
+        o3.rotation.set(g ? 0.35 : 0, a, g ? -0.3 : 0); o3.scale.setScalar(sg); o3.updateMatrix();
+        stones.setMatrixAt(i * 3 + g, o3.matrix);
+      }
+    });
+    stones.name = 'lodestones'; stones.raycast = () => {};
+    group.add(stones);
   }
-  group.add(bank);
+
+  // ---- 5. the sea of cloud: a floor of it far below, turning slowly, and wisps
+  // caught in the gaps between the islands ----
+  const floor = [], wisps = [];
+  for (let i = 0; i < 300; i++) {
+    const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * half * 1.75, w = 240 + rand() * 440;
+    floor.push({ x: Math.cos(a) * r, y: -150 - rand() * 150, z: Math.sin(a) * r, w, h: w * 0.56, opacity: 0.42 + rand() * 0.42, phase: rand() * 6.28 });
+  }
+  for (let tries = 0; tries < 600 && wisps.length < 60; tries++) {
+    const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * half * 0.95, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (!inAir(x, z, 14)) continue;
+    const w = 130 + rand() * 170;
+    wisps.push({ x, y: field.liftAt(x, z) - 16 - rand() * 70, z, w, h: w * 0.42, opacity: 0.2 + rand() * 0.26, phase: rand() * 6.28 });
+  }
+  const bank = billboards(floor), mist = billboards(wisps, { near: [50, 210] });
+  bank.mesh.renderOrder = 0; mist.mesh.renderOrder = 3;
+  group.add(bank.mesh, mist.mesh);
 
   group.visible = false;             // shown only when the flying mode is active
   return {
     group,
     setVisible(v) { group.visible = v; },
-    update(t) { bank.rotation.y = t * 0.006; },
+    update(t) {
+      uTime.value = t;
+      bank.mesh.rotation.y = t * 0.006; bank.uniforms.uTime.value = t; mist.uniforms.uTime.value = t;
+    },
   };
-}
-
-function makeCloudTexture() {
-  const s = 128;
-  const cv = document.createElement('canvas'); cv.width = s; cv.height = s;
-  const ctx = cv.getContext('2d');
-  for (const [cx, cy, r] of [[0.5, 0.52, 0.46], [0.34, 0.56, 0.28], [0.66, 0.56, 0.3], [0.5, 0.42, 0.3]]) {
-    const g = ctx.createRadialGradient(cx * s, cy * s, 1, cx * s, cy * s, r * s);
-    g.addColorStop(0, 'rgba(255,255,255,0.95)');
-    g.addColorStop(0.6, 'rgba(250,251,253,0.5)');
-    g.addColorStop(1, 'rgba(245,248,252,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx * s, cy * s, r * s, 0, Math.PI * 2); ctx.fill();
-  }
-  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
 }

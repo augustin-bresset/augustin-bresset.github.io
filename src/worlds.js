@@ -1,4 +1,4 @@
-// worlds.js — the four WORLDS the top selector cycles through. Each is a full,
+// worlds.js — the WORLDS the top selector cycles through. Each is a full,
 // distinct generation you fly into (NOT a reskin of the island): picking one
 // regenerates everything and sets its own ambiance. This replaces the old split of a
 // "theme" toggle (ambiance) + a hidden ?mode= (generation) — both fold into ?world=.
@@ -6,12 +6,14 @@
 //   island   — the default grounded island, on the sea (warm diorama ambiance)
 //   floating — the archipelago: separate islands adrift in the sky (diorama)
 //   croquis  — an ENDLESS hand-drawn sky you fly through: pencil clouds + airships on
-//              paper (its own generator, src/croquis.js; pale sketch ambiance)
+//              paper (its own generator, src/croquis.js; pale sketch ambiance).
+//              SWITCHED OFF (`off`): the selector no longer leads to it; the world
+//              itself is kept, and still opens from ?world=croquis
 //   land     — the big endless continent (diorama), heavier to load
 export const WORLDS = [
   { key: 'island',   mode: 'island',   ambiance: 'diorama', name: { fr: 'Île', en: 'Island' } },
   { key: 'floating', mode: 'floating', ambiance: 'diorama', name: { fr: 'Île volante', en: 'Flying island' } },
-  { key: 'croquis',  croquis: true,    ambiance: 'sketch',  name: { fr: 'Croquis', en: 'Croquis' } },
+  { key: 'croquis',  croquis: true,    ambiance: 'sketch',  name: { fr: 'Croquis', en: 'Croquis' }, off: true },
   { key: 'land',     mode: 'land',     ambiance: 'diorama', name: { fr: 'Terres', en: 'Lands' } },
 ];
 
@@ -27,8 +29,9 @@ export function resolveWorld(qp) {
 }
 
 export function nextWorld(key) {
-  const i = WORLDS.findIndex((w) => w.key === key);
-  return WORLDS[(i + 1) % WORLDS.length];
+  let i = WORLDS.findIndex((w) => w.key === key);
+  do i = (i + 1) % WORLDS.length; while (WORLDS[i].off);
+  return WORLDS[i];
 }
 
 export function worldName(world, lang) {

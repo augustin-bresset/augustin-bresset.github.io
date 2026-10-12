@@ -13,11 +13,9 @@ function hash2(i, j) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-// opts.cellVisible(i,j) — optional per-cell mask (floating/archipelago mode): a cell
-// that fails the test is collapsed to a degenerate (zero-area) triangle so it renders
-// nothing, carving the continent into separate floating islands with sky between them.
-// (flatShading computes normals in-shader from position derivatives, so degenerate
-// faces are safe — the vertex-normal buffer is unused.)
+// opts.shape — optional { px, pz, tris, cells } (floating islands, gen/islands.js): only
+// those triangles are built, on vertices moved onto the islands' outlines — the country
+// broken up into islands, with sky between them.
 // opts.zones — optional [{x, z, r, color}]: city-ground fusion rings. Terrain faces
 // near a city are tinted toward that city's own ground colour (full inside the pad,
 // feathering out to ~1.7r), so the settlement grows out of the landscape instead of
@@ -26,10 +24,22 @@ function hash2(i, j) {
 // its crop's colour, darker along the hedges.
 export function buildTerrainMesh(field, opts = {}) {
   const { N, heights, biome, moisture, blendIds, blendW, idx, gx, gz, verts } = field;
-  const cellVisible = opts.cellVisible || (() => true);
+  const shape = opts.shape || null, lift = field.lift || null;
   const zones = (opts.zones || []).map((z) => ({ ...z, c: new THREE.Color(z.color) }));
   const fields = opts.fields || null, crop = {}, cropColor = new THREE.Color(), hedge = new THREE.Color('#5f8347');
-  const triCount = N * N * 2;
+  // the FACES: three grid vertices each (ka, kb, kc), and the cell it is cut from (ci, cj,
+  // and which side of it) — every cell of the grid, or the ones an island is made of
+  const triCount = shape ? shape.tris.length / 3 : N * N * 2;
+  let ka = 0, kb = 0, kc = 0, ci = 0, cj = 0, side = 0;
+  const face = shape
+    ? (f) => { ka = shape.tris[f * 3]; kb = shape.tris[f * 3 + 1]; kc = shape.tris[f * 3 + 2]; ci = shape.cells[f * 3]; cj = shape.cells[f * 3 + 1]; side = shape.cells[f * 3 + 2]; }
+    : (f) => {
+      const c = f >> 1;
+      ci = c % N; cj = (c / N) | 0; side = f & 1;
+      if (side) { ka = idx(ci + 1, cj); kb = idx(ci, cj + 1); kc = idx(ci + 1, cj + 1); } else { ka = idx(ci, cj); kb = idx(ci, cj + 1); kc = idx(ci + 1, cj); }
+    };
+  const X = shape ? (k) => shape.px[k] : (k) => gx(k % verts);
+  const Z = shape ? (k) => shape.pz[k] : (k) => gz((k / verts) | 0);
   const positions = new Float32Array(triCount * 3 * 3);
   const colors = new Float32Array(triCount * 3 * 3);
 
@@ -43,12 +53,14 @@ export function buildTerrainMesh(field, opts = {}) {
   const hollow = new Float32Array(verts * verts);
   {
     const cell = field.size / N, R = 3;
-    const at = (i, j) => heights[idx(Math.max(0, Math.min(N, i)), Math.max(0, Math.min(N, j)))];
+    // (on a floating island: its height above the island's own level — the air beyond
+    // its edge is no hollow and no ridge)
+    const at = (i, j) => { const k = idx(Math.max(0, Math.min(N, i)), Math.max(0, Math.min(N, j))); return heights[k] - (lift ? lift[k] : 0); };
     const raw = new Float32Array(verts * verts);
     for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
       const ring = at(i - R, j) + at(i + R, j) + at(i, j - R) + at(i, j + R)
         + at(i - 2, j - 2) + at(i + 2, j - 2) + at(i - 2, j + 2) + at(i + 2, j + 2);
-      raw[idx(i, j)] = clamp((ring / 8 - heights[idx(i, j)]) / (cell * 1.8), -1, 1);
+      raw[idx(i, j)] = clamp((ring / 8 - at(i, j)) / (cell * 1.8), -1, 1);
     }
     // …smoothed, so it follows valleys and ridges rather than every bump of the ground
     const rawAt = (i, j) => raw[idx(Math.max(0, Math.min(N, i)), Math.max(0, Math.min(N, j)))];
@@ -73,90 +85,53 @@ export function buildTerrainMesh(field, opts = {}) {
       for (let q = 0; q < 3; q++) if (blendIds[k * 3 + q] === BIOME.SNOW) sn += blendW[k * 3 + q];
       snowy[k] = sn;
     }
-    let o = 0;
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        const y00 = heights[idx(i, j)], y10 = heights[idx(i + 1, j)];
-        const y01 = heights[idx(i, j + 1)], y11 = heights[idx(i + 1, j + 1)];
-        const b00 = biome[idx(i, j)];
-        const x0 = gx(i), x1 = gx(i + 1), z0 = gz(j), z1 = gz(j + 1);
-        const tris = [
-          [x0, y00, z0, x0, y01, z1, x1, y10, z0],
-          [x1, y10, z0, x0, y01, z1, x1, y11, z1],
-        ];
-        // the grid vertices at each triangle's corners (same order as above)
-        const k00 = idx(i, j), k10 = idx(i + 1, j), k01 = idx(i, j + 1), k11 = idx(i + 1, j + 1);
-        const corners = [[k00, k01, k10], [k10, k01, k11]];
-        for (let ti = 0; ti < 2; ti++) {
-          const [ax, ay, az, bx, by, bz, cx, cy, cz] = tris[ti];
-          pA.set(ax, ay, az); pB.set(bx, by, bz); pC.set(cx, cy, cz);
-          ab.subVectors(pB, pA); ac.subVectors(pC, pA);
-          nrm.crossVectors(ab, ac).normalize();
-          const slope = 1 - clamp(nrm.y, 0, 1);
-          const my = (ay + by + cy) / 3;
-          const jit = (hash2(i * 2 + ti, j) - 0.5) * 0.05;
-          // a face is the mean of its three corners
-          const [ka, kb, kc] = corners[ti];
-          col.setRGB((ground[ka * 3] + ground[kb * 3] + ground[kc * 3]) / 3,
-            (ground[ka * 3 + 1] + ground[kb * 3 + 1] + ground[kc * 3 + 1]) / 3,
-            (ground[ka * 3 + 2] + ground[kb * 3 + 2] + ground[kc * 3 + 2]) / 3);
-          rock.setRGB((rocks[ka * 3] + rocks[kb * 3] + rocks[kc * 3]) / 3,
-            (rocks[ka * 3 + 1] + rocks[kb * 3 + 1] + rocks[kc * 3 + 1]) / 3,
-            (rocks[ka * 3 + 2] + rocks[kb * 3 + 2] + rocks[kc * 3 + 2]) / 3);
-          if (fields && slope < 0.14 && fields.at((ax + bx + cx) / 3, (az + bz + cz) / 3, my, b00, crop)) {
-            col.lerp(cropColor.set(crop.color), 0.86);
-            if (crop.edge) col.lerp(hedge, 0.72);
-          }
-          shadeFace(col, rock, b00, my, slope, (hollow[ka] + hollow[kb] + hollow[kc]) / 3, jit, (snowy[ka] + snowy[kb] + snowy[kc]) / 3);
-          // city-ground fusion: the terrain IS the city floor now (no platform
-          // mesh) — near-uniform city colour inside the pad radius, feathering
-          // back to the biome beyond it
-          for (const zn of zones) {
-            const mx = (ax + bx + cx) / 3, mz = (az + bz + cz) / 3;
-            const d = Math.hypot(mx - zn.x, mz - zn.z);
-            if (d > zn.r * 1.45) continue;
-            const tt = d < zn.r ? 0.94
-              : 0.94 * (1 - clamp((d - zn.r) / (zn.r * 0.45), 0, 1));
-            col.lerp(zn.c, tt);
-          }
-          for (let v = 0; v < 3; v++) {
-            colors[o + v * 3] = col.r;
-            colors[o + v * 3 + 1] = col.g;
-            colors[o + v * 3 + 2] = col.b;
-          }
-          o += 9;
-        }
+    for (let f = 0, o = 0; f < triCount; f++, o += 9) {
+      face(f);
+      const b00 = biome[idx(ci, cj)];
+      pA.set(X(ka), heights[ka], Z(ka)); pB.set(X(kb), heights[kb], Z(kb)); pC.set(X(kc), heights[kc], Z(kc));
+      ab.subVectors(pB, pA); ac.subVectors(pC, pA);
+      nrm.crossVectors(ab, ac).normalize();
+      const slope = 1 - clamp(nrm.y, 0, 1);
+      const mx = (pA.x + pB.x + pC.x) / 3, mz = (pA.z + pB.z + pC.z) / 3;
+      // (its height above ITS island's own level: what the shore, the fields, the flowers go by)
+      const my = (pA.y + pB.y + pC.y) / 3 - (lift ? (lift[ka] + lift[kb] + lift[kc]) / 3 : 0);
+      const jit = (hash2(ci * 2 + side, cj) - 0.5) * 0.05;
+      // a face is the mean of its three corners
+      col.setRGB((ground[ka * 3] + ground[kb * 3] + ground[kc * 3]) / 3,
+        (ground[ka * 3 + 1] + ground[kb * 3 + 1] + ground[kc * 3 + 1]) / 3,
+        (ground[ka * 3 + 2] + ground[kb * 3 + 2] + ground[kc * 3 + 2]) / 3);
+      rock.setRGB((rocks[ka * 3] + rocks[kb * 3] + rocks[kc * 3]) / 3,
+        (rocks[ka * 3 + 1] + rocks[kb * 3 + 1] + rocks[kc * 3 + 1]) / 3,
+        (rocks[ka * 3 + 2] + rocks[kb * 3 + 2] + rocks[kc * 3 + 2]) / 3);
+      if (fields && slope < 0.14 && fields.at(mx, mz, my, b00, crop)) {
+        col.lerp(cropColor.set(crop.color), 0.86);
+        if (crop.edge) col.lerp(hedge, 0.72);
+      }
+      shadeFace(col, rock, b00, my, slope, (hollow[ka] + hollow[kb] + hollow[kc]) / 3, jit, (snowy[ka] + snowy[kb] + snowy[kc]) / 3);
+      // city-ground fusion: the terrain IS the city floor now (no platform
+      // mesh) — near-uniform city colour inside the pad radius, feathering
+      // back to the biome beyond it
+      for (const zn of zones) {
+        const d = Math.hypot(mx - zn.x, mz - zn.z);
+        if (d > zn.r * 1.45) continue;
+        const tt = d < zn.r ? 0.94
+          : 0.94 * (1 - clamp((d - zn.r) / (zn.r * 0.45), 0, 1));
+        col.lerp(zn.c, tt);
+      }
+      for (let v = 0; v < 3; v++) {
+        colors[o + v * 3] = col.r;
+        colors[o + v * 3 + 1] = col.g;
+        colors[o + v * 3 + 2] = col.b;
       }
     }
   };
 
   // positions (once)
-  let o = 0;
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      const x0 = gx(i), x1 = gx(i + 1), z0 = gz(j), z1 = gz(j + 1);
-      const y00 = heights[idx(i, j)], y10 = heights[idx(i + 1, j)];
-      const y01 = heights[idx(i, j + 1)], y11 = heights[idx(i + 1, j + 1)];
-      // masked cell → both triangles collapse onto one point (invisible)
-      if (!cellVisible(i, j)) {
-        for (let v = 0; v < 18; v += 3) {
-          positions[o + v] = x0; positions[o + v + 1] = y00; positions[o + v + 2] = z0;
-        }
-        o += 18;
-        continue;
-      }
-      const tris = [
-        [x0, y00, z0, x0, y01, z1, x1, y10, z0],
-        [x1, y10, z0, x0, y01, z1, x1, y11, z1],
-      ];
-      for (let ti = 0; ti < 2; ti++) {
-        const [ax, ay, az, bx, by, bz, cx, cy, cz] = tris[ti];
-        positions[o] = ax; positions[o + 1] = ay; positions[o + 2] = az;
-        positions[o + 3] = bx; positions[o + 4] = by; positions[o + 5] = bz;
-        positions[o + 6] = cx; positions[o + 7] = cy; positions[o + 8] = cz;
-        o += 9;
-      }
-    }
+  for (let f = 0, o = 0; f < triCount; f++, o += 9) {
+    face(f);
+    positions[o] = X(ka); positions[o + 1] = heights[ka]; positions[o + 2] = Z(ka);
+    positions[o + 3] = X(kb); positions[o + 4] = heights[kb]; positions[o + 5] = Z(kb);
+    positions[o + 6] = X(kc); positions[o + 7] = heights[kc]; positions[o + 8] = Z(kc);
   }
   writeColors();
 

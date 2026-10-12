@@ -26,6 +26,11 @@ export class UI {
     this.activeNote = null;     // { cityId, poiId, accent, mount }
     this._hintKey = 'hint';
     this._legendCities = null;
+    // the legend is a MENU that unrolls: open on a desk, rolled up on a phone, where it
+    // would hide a third of the view — and it remembers what the visitor last chose
+    this._small = () => window.matchMedia && window.matchMedia('(max-width: 720px), (max-height: 520px)').matches;
+    this._legendOpen = !this._small();
+    try { const kept = localStorage.getItem('legendOpen'); if (kept != null) this._legendOpen = kept === '1'; } catch (e) { /* no storage */ }
     this.refreshLang();
   }
 
@@ -34,9 +39,24 @@ export class UI {
     this._legendCities = cities;
     this.renderLegend();
     this.legend.addEventListener('click', (e) => {
+      if (e.target.closest('.legend-title')) {
+        this.openLegend(!this._legendOpen);
+        try { localStorage.setItem('legendOpen', this._legendOpen ? '1' : '0'); } catch (err) { /* no storage */ }
+        return;
+      }
       const btn = e.target.closest('.legend-item');
-      if (btn) onPick(btn.dataset.id);
+      if (!btn) return;
+      if (this._small()) this.openLegend(false);      // (on a phone it rolls back up, out of the way of the flight)
+      onPick(btn.dataset.id);
     });
+  }
+
+  openLegend(open) {
+    this._legendOpen = open;
+    if (!this.legend) return;
+    this.legend.classList.toggle('legend--closed', !open);
+    const title = this.legend.querySelector('.legend-title');
+    if (title) title.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   renderLegend() {
@@ -49,7 +69,10 @@ export class UI {
         <span class="legend-text"><span class="legend-name">${name}</span><span class="legend-sub">${sub}</span></span>
       </button>`;
     }).join('');
-    this.legend.innerHTML = `<div class="legend-title">${LANG.t('legendTitle')}</div>${items}`;
+    this.legend.innerHTML = `<button class="legend-title" aria-controls="legend-list">
+        <span>${LANG.t('legendTitle')}</span><span class="legend-caret" aria-hidden="true"></span>
+      </button><div class="legend-list" id="legend-list">${items}</div>`;
+    this.openLegend(this._legendOpen);
   }
 
   setLegend(visible) {

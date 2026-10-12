@@ -18,7 +18,7 @@ python3 serve.py
 `serve.py` is `python3 -m http.server` plus a no-cache header: with the plain server the
 browser keeps old ES modules for hours, and a reload doesn't show your edits.
 
-URL params: `?seed=123` (reproducible world) · `?trend=alpine|tropical|arid|autumn|boreal|…` (its climate) · `?relief=domes|crests|needles|tables|towers|volcano` (the shape of its mountains) · `?lang=fr|en` · `?focus=toaster` · `?stats` (frame cost readout)
+URL params: `?world=island|floating|land` (the world: an island on the sea, an archipelago adrift in the sky, a continent) · `?seed=123` (reproducible world) · `?trend=alpine|tropical|arid|autumn|boreal|…` (its climate) · `?relief=domes|crests|needles|tables|towers|volcano` (the shape of its mountains) · `?lang=fr|en` · `?focus=toaster` · `?stats` (frame cost readout)
 (deep-link straight into a project) · `?outline=1` (experimental ink outline).
 
 ## Architecture
@@ -44,11 +44,16 @@ src/
     hydrology.js     flow-accumulation rivers + a carved ravine (real terrain technique)
     features.js      what the finished land holds: its peak, lakes, waterfalls, lava
     farmland.js      the fields round the farming towns
+    islands.js       the floating archipelago: which land is an island, its smooth outline,
+                     the height each island rides at
     biomes.js        sea/beach/grass/forest/rock/snow/cliff classification + colours
     placement.js     jittered-grid scatter of trees / rocks / reeds by biome
   bricks/            terrain.js, water.js, rivers.js, lakes.js, falls.js, volcano.js (lava,
                      plume), trees.js, rocks.js, clouds.js, weather.js, life.js (herds,
-                     birds, balloons, whales, sails, and each climate's monuments)
+                     birds, balloons, whales, sails, and each climate's monuments),
+                     skyways.js (tubes and aircraft between towns), flying.js (the rock
+                     under floating islands, what drifts round them, the sea of cloud),
+                     bridges.js (rope bridges from island to island)
   cities/
     registry.js      the list of projects (anchors + builders)  ← extend here
     kit.js           shared building blocks (boxes, glow, labels…)

@@ -35,9 +35,9 @@ import { placeCities } from './cities/placement.js';
 // Generation PRESETS (?mode=) share that camera scale:
 //   island (default) — a big island whose coast follows the Voronoi cells (sea is
 //     forced as you get far from centre); a modest grid, so it loads fast anywhere.
-//   floating (?mode=floating) — the same island generation, but adrift in a blue
-//     sky: a jagged rock underside hangs beneath it and a cloud sea replaces the
-//     ocean (the flying island is a way to GENERATE the world, not a theme).
+//   floating (?world=floating) — the same country, broken up into islands adrift in
+//     the sky, each riding at its own height: rock hangs beneath them, the rivers
+//     pour off their edges, and a sea of cloud replaces the ocean (gen/islands.js).
 //   land  (?mode=land) — the much larger endless continent; heavier to load.
 export const WORLD = { size: 1000, half: 500 };
 // `vista` is the radius scale of the ring the home view scans for mountains (see
@@ -101,29 +101,32 @@ export function buildWorld(stage, seed, { mode = 'island', trend = null, relief 
       : null;
   }
 
-  // 4c. FLYING ARCHIPELAGO (?mode=floating): carve the continent into SEPARATE
-  // floating islands — one blob of land per settlement (+ the summit). The field
-  // masks the terrain (sky between islands), culls scatter that would float in the
-  // void, clips rivers to the land, and hands each island a coastline rim so the
-  // flying rig can hang a matching rocky underside. Null in the grounded modes.
+  // 4c. FLYING ARCHIPELAGO (?world=floating): the country is broken up into islands
+  // (gen/islands.js) — the towns' own, the massif's, a few wild islets — and each is
+  // LIFTED to the height it rides at. What was already placed comes up with its
+  // island; the rivers are cut at the edges, and where one runs off an edge it spills
+  // into the air. Null in the grounded modes.
   let islandField = null;
+  const spills = [];
   if (cfg.flying) {
-    const anchors = cityPads.map((p) => ({ x: p.x, z: p.z }));
-    anchors.push({ x: peak.x, z: peak.z });                  // the roof of the world floats too
-    islandField = buildIslandField(field, anchors, seed);
-    hydro.rivers = clipLinesToIslands(hydro.rivers, islandField, 4);
-    if (hydro.ravine) {
-      const rav = clipLinesToIslands([hydro.ravine], islandField, 6)[0] || null;
-      hydro.ravine = rav;
-    }
+    islandField = buildIslandField(field, cityPads.map((p) => ({ x: p.x, z: p.z, r: p.city.radius })), seed);
+    for (const p of cityPads) p.y += field.liftAt(p.x, p.z);
+    for (const line of hydro.rivers) for (const pt of line) pt.y += field.liftAt(pt.x, pt.z);
+    // (the roof of the world may be another summit, now that every island has its own level)
+    const { heights, verts, gx, gz } = field;
+    let top = -1;
+    for (let k = 0; k < heights.length; k++) if (islandField.used[k] && (top < 0 || heights[k] > heights[top])) top = k;
+    if (top >= 0) Object.assign(peak, { x: gx(top % verts), y: heights[top], z: gz((top / verts) | 0) });
+    hydro.rivers = clipLinesToIslands(hydro.rivers, islandField, 4, spills);
+    if (hydro.ravine) hydro.ravine = clipLinesToIslands([hydro.ravine], islandField, 6).reduce((a, b) => (a && a.length >= b.length ? a : b), null);
   }
 
   // 4d. the SIGHTS of the relief (gen/features.js): lakes laid in the lowland hollows,
   // the lava's ways down a volcano, the lips the streams fall from
-  const onLand = islandField ? (x, z) => islandField.atWorld(x, z) : null;
+  const onLand = islandField ? (x, z) => islandField.atWorld(x, z, 6) : null;
   const lakes = carveLakes(field, graph, seed, {
-    count: LAKES[graph.trend] ?? 3, inside: onLand,
-    avoid: cityPads.map((p) => ({ x: p.x, z: p.z, r: p.city.radius * 2.1 })),   // (clear of the shelf each town levelled)
+    count: LAKES[graph.trend] ?? 3, inside: onLand, ...(islandField ? { size: [13, 17] } : {}),
+    avoid: cityPads.map((p) => ({ x: p.x, z: p.z, r: p.city.radius * (islandField ? 1.5 : 2.1) })),   // (clear of the shelf each town levelled)
   });
   exclusions.push(...lakes);
   const lava = crater && (!onLand || onLand(crater.x, crater.z)) ? traceLava(field, crater) : null;
@@ -138,6 +141,12 @@ export function buildWorld(stage, seed, { mode = 'island', trend = null, relief 
   // …and round the farming towns, their fields
   const fields = planFields(field, cityPads, seed, graph.trend, { skip: exclusions.slice(cityPads.length) });
   const falls = findFalls(field, { max: Math.ceil((FALLS[graph.massif.style] ?? 5) * (graph.trend === 'arid' ? 0.45 : 1)), avoid: exclusions, inside: onLand });
+  // …and off the edge of a floating island, the biggest of its rivers fall free
+  spills.sort((a, b) => b.flow - a.flow);
+  for (const sp of spills.slice(0, 9)) {
+    if (falls.some((f) => f.free && Math.hypot(f.lip.x - sp.x, f.lip.z - sp.z) < 60)) continue;
+    falls.push({ lip: { x: sp.x, y: field.heightAt(sp.x, sp.z), z: sp.z }, dir: sp.dir, drop: 150 + ((sp.x * 7 + sp.z * 13) % 90 + 90) % 90, flow: sp.flow, free: true });
+  }
 
   // the ground is final: what the camera must stay above (see camera.js)
   addCeiling(field);
@@ -153,12 +162,12 @@ export function buildWorld(stage, seed, { mode = 'island', trend = null, relief 
   const slope = computeSlope(field);
   const scatter = planScatter(field, slope, hydro, seed, exclusions, graph.trend, fields);
   if (islandField) {
-    for (const key of ['trees', 'bushes', 'rocks', 'reeds']) scatter[key] = scatter[key].filter((t) => islandField.atWorld(t.x, t.z));
+    for (const key of ['trees', 'bushes', 'rocks', 'reeds']) scatter[key] = scatter[key].filter((t) => islandField.atWorld(t.x, t.z, 2.5));
     scatter.stacks = [];              // no sea under a floating island
   }
 
   // 6. terrain mesh (its edge is far past the fog + the camera clamp; in the
-  // archipelago, masked cells collapse to nothing so only the islands remain).
+  // archipelago, only the islands' own triangles are built).
   // CITY-TERRAIN FUSION: the ground around each city is tinted toward that city's
   // own ground colour, so the pad reads as growing out of the landscape instead of
   // a plate dropped onto it.
@@ -172,8 +181,7 @@ export function buildWorld(stage, seed, { mode = 'island', trend = null, relief 
     color: CITY_GROUND[p.city.id] ?? 0xb6a07e,
   }));
   const terrain = buildTerrainMesh(field, {
-    ...(islandField ? { cellVisible: islandField.cellVisible } : {}),
-    zones: groundZones, fields,
+    shape: islandField, zones: groundZones, fields,
   });
   group.add(terrain.mesh);
 
@@ -246,12 +254,11 @@ export function buildWorld(stage, seed, { mode = 'island', trend = null, relief 
   group.add(sea.mesh);
   updaters.push((t) => sea.update(t));
 
-  // 13. FLYING-ISLAND rig (underside rock + cloud sea) — this is a GENERATION mode
-  // (?mode=floating), not a theme: when on, the rock underside hangs below the
-  // island, a cloud sea replaces the ocean, and the sea plane is hidden. Built only
+  // 13. FLYING-ISLAND rig (the rock under the islands, what drifts round them, the
+  // sea of cloud) — a GENERATION mode, not a theme: the ocean is hidden. Built only
   // for floating worlds. See bricks/flying.js.
   if (cfg.flying) {
-    const flying = buildFlying(field, cfg.half, seed, { islands: islandField });
+    const flying = buildFlying(field, cfg.half, seed, { islands: islandField, trend: graph.trend });
     group.add(flying.group);
     flying.setVisible(true);
     sea.mesh.visible = false;        // no ocean under a floating island
@@ -304,8 +311,16 @@ export function buildWorld(stage, seed, { mode = 'island', trend = null, relief 
     });
   };
 
-  const places = { ...life.places, summit: peak, ...(lakes[0] ? { lake: { x: lakes[0].x, y: lakes[0].level, z: lakes[0].z } } : {}), ...(falls[0] ? { falls: { x: falls[0].foot.x, y: (falls[0].foot.y + falls[0].lip.y) / 2, z: falls[0].foot.z, look: Math.atan2(falls[0].foot.x - falls[0].lip.x, falls[0].foot.z - falls[0].lip.z), drop: falls[0].drop } } : {}) };
-  return { group, updaters, cities, tickCities, detailMask, field, graph, hydro, slope, scatter, scenicAzimuth, restyle, trend: graph.trend, relief: graph.massif.style, places };
+  const sight = (f) => (f.free
+    ? { x: f.lip.x, y: f.lip.y - 40, z: f.lip.z, look: Math.atan2(f.dir.x, f.dir.z), drop: f.drop }
+    : { x: f.foot.x, y: (f.foot.y + f.lip.y) / 2, z: f.foot.z, look: Math.atan2(f.foot.x - f.lip.x, f.foot.z - f.lip.z), drop: f.drop });
+  const spill = falls.find((f) => f.free);
+  const places = {
+    ...life.places, summit: peak,
+    ...(lakes[0] ? { lake: { x: lakes[0].x, y: lakes[0].level, z: lakes[0].z } } : {}),
+    ...(falls[0] ? { falls: sight(falls[0]) } : {}), ...(spill ? { spill: sight(spill) } : {}),
+  };
+  return { group, updaters, cities, tickCities, detailMask, field, graph, hydro, slope, scatter, scenicAzimuth, restyle, trend: graph.trend, relief: graph.massif.style, places, islands: islandField };
 }
 
 // ---- LEVEL OF DETAIL --------------------------------------------------------------
@@ -417,23 +432,32 @@ function splitLinesAroundZones(lines, zones, minLen) {
   return out;
 }
 
-// Clip river/ravine polylines to the archipelago: keep each line's LONGEST run of
-// points that sit on island land, dropping runs shorter than `minLen` — so no water
-// ribbon is left hanging in the sky over a masked gap.
-function clipLinesToIslands(lines, islandField, minLen) {
+// Clip river/ravine polylines to the archipelago: every run of points that lies on an
+// island is kept (a river may cross two of them), runs shorter than `minLen` dropped —
+// so no water ribbon is left hanging in the sky. Where a run ends because the ground
+// does (the water was still flowing), that is a SPILL: { x, z, dir, flow } is pushed
+// onto `spills` — the river goes over the edge there.
+function clipLinesToIslands(lines, islandField, minLen, spills = null) {
   const out = [];
   for (const line of lines) {
-    let best = null, run = [];
-    const flush = () => {
-      if (run.length >= minLen && (!best || run.length > best.length)) best = run;
+    let run = [];
+    const flush = (next) => {
+      if (run.length >= minLen) {
+        out.push(run);
+        const end = run[run.length - 1], prev = run[run.length - 3] || run[0];
+        const dx = end.x - prev.x, dz = end.z - prev.z, len = Math.hypot(dx, dz) || 1;
+        const ahead = next || { x: end.x + dx / len * 8, z: end.z + dz / len * 8 };
+        if (spills && !islandField.atWorld(ahead.x, ahead.z) && !islandField.atWorld(end.x + dx / len * 16, end.z + dz / len * 16)) {
+          spills.push({ x: end.x, z: end.z, dir: { x: dx / len, z: dz / len }, flow: end.acc || 12 });
+        }
+      }
       run = [];
     };
     for (const p of line) {
-      if (islandField.atWorld(p.x, p.z)) run.push(p);
-      else flush();
+      if (islandField.atWorld(p.x, p.z, 1.5)) run.push(p);
+      else flush(p);
     }
-    flush();
-    if (best) out.push(best);
+    flush(null);
   }
   return out;
 }

@@ -1,10 +1,13 @@
 // falls.js (brick) — the great WATERFALLS: where gen/features.js findFalls found a
 // stream going over a lip, a curtain of white water from the lip to the foot of the
 // drop, spray boiling up where it lands, and over the tallest of them a rainbow.
+// A FREE fall (`free`: a river running off the edge of a floating island) has no foot:
+// it arcs out into the air, widens, and thins away to mist long before it lands.
 import * as THREE from 'three';
 import { billboards } from './clouds.js';
 
-// falls: [{ lip, foot: { x, y, z }, drop, flow }] · field: the terrain
+// falls: [{ lip, foot: { x, y, z }, drop, flow }] — or, free: [{ lip, dir: { x, z }, drop, flow, free: true }]
+// field: the terrain
 export function buildFalls(falls, field) {
   const group = new THREE.Group();
   group.name = 'falls';
@@ -12,8 +15,28 @@ export function buildFalls(falls, field) {
   const uTime = { value: 0 };
 
   // ---- the curtains: one mesh for all of them ----
-  const pos = [], uvs = [], index = [], spray = [];
+  const pos = [], uvs = [], fade = [], index = [], spray = [];
   for (const f of falls) {
+    if (f.free) {
+      const { x: dx, z: dz } = f.dir;
+      const w0 = Math.min(6.5, 2.2 + 0.32 * Math.sqrt(f.flow)), SEG = 22, base = pos.length / 3, throwOut = 9 + f.drop * 0.045;
+      const at = (t) => [f.lip.x + dx * (-1.2 + throwOut * t), f.lip.y - 0.3 - f.drop * t * t, f.lip.z + dz * (-1.2 + throwOut * t)];
+      for (let s = 0; s <= SEG; s++) {
+        const t = s / SEG, w = w0 * (0.8 + 1.7 * t), [cx, cy, cz] = at(t);
+        for (const side of [-1, 0, 1]) {
+          pos.push(cx - dz * w * side + (side ? 0 : dx * w * 0.3), cy, cz + dx * w * side + (side ? 0 : dz * w * 0.3));
+          uvs.push(side * 0.5 + 0.5, t * f.drop / 14);
+          fade.push(1 - t * t * (3 - 2 * t) * 0.97);
+        }
+        if (s < SEG) { const k = base + s * 3; index.push(k, k + 3, k + 1, k + 1, k + 3, k + 4, k + 1, k + 4, k + 2, k + 2, k + 4, k + 5); }
+      }
+      // it comes apart on the way down: a plume of mist where the water was
+      for (let i = 0; i < 6; i++) {
+        const t = 0.42 + 0.58 * (i / 5), [cx, cy, cz] = at(t), size = (12 + f.drop * 0.1) * (0.6 + t) * (0.8 + Math.random() * 0.4);
+        spray.push({ x: cx + (Math.random() - 0.5) * 6, y: cy, z: cz + (Math.random() - 0.5) * 6, w: size, h: size * 0.9, opacity: 0.36 - 0.2 * t, phase: Math.random() * 6.28 });
+      }
+      continue;
+    }
     let dx = f.foot.x - f.lip.x, dz = f.foot.z - f.lip.z;
     const run = Math.hypot(dx, dz) || 1; dx /= run; dz /= run;
     const w0 = Math.min(6.5, 2.2 + 0.32 * Math.sqrt(f.flow)), SEG = 16, base = pos.length / 3;
@@ -27,6 +50,7 @@ export function buildFalls(falls, field) {
         const y = Math.max(f.lip.y - 0.4 - f.drop * t * t, field.heightAt(x, z) + (side ? 0.5 : 1.1));
         pos.push(x, y, z);
         uvs.push(side * 0.5 + 0.5, t * f.drop / 14);
+        fade.push(1);
       }
       if (s < SEG) { const k = base + s * 3; index.push(k, k + 3, k + 1, k + 1, k + 3, k + 4, k + 1, k + 4, k + 2, k + 2, k + 4, k + 5); }
     }
@@ -43,6 +67,7 @@ export function buildFalls(falls, field) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('aFade', new THREE.Float32BufferAttribute(fade, 1));
   geo.setIndex(index);
   geo.computeVertexNormals();
   // (white water is bright even in the shadow of its cliff: it carries a light of its own)
@@ -50,10 +75,10 @@ export function buildFalls(falls, field) {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uTime;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vFall;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFall = uv;');
+      .replace('#include <common>', '#include <common>\nattribute float aFade;\nvarying vec2 vFall;\nvarying float vFade;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vFall = uv; vFade = aFade;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec2 vFall;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec2 vFall;\nvarying float vFade;')
       .replace('#include <color_fragment>', `#include <color_fragment>
         float edge = abs(vFall.x - 0.5) * 2.0;
         // the water comes down in strands, each with its own pulses of white racing
@@ -62,7 +87,7 @@ export function buildFalls(falls, field) {
         float pulse = fract(vFall.y * 0.3 - uTime * (0.8 + 0.22 * sin(strand * 12.9)) + sin(strand * 78.2) * 3.0);
         float race = smoothstep(0.0, 0.25, pulse) * (1.0 - smoothstep(0.45, 1.0, pulse));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), 0.5 + 0.5 * race * (1.0 - 0.5 * abs(within - 0.5)));
-        diffuseColor.a = (1.0 - smoothstep(0.55, 1.0, edge)) * (0.78 + 0.22 * race) * smoothstep(0.0, 0.25, vFall.y);`);
+        diffuseColor.a = (1.0 - smoothstep(0.55, 1.0, edge)) * (0.78 + 0.22 * race) * smoothstep(0.0, 0.25, vFall.y) * vFade;`);
   };
   const curtain = new THREE.Mesh(geo, mat);
   curtain.renderOrder = 2; curtain.raycast = () => {};
@@ -72,8 +97,10 @@ export function buildFalls(falls, field) {
   mist.mesh.renderOrder = 3;
   group.add(mist.mesh);
 
-  // ---- the rainbow, in the spray of the tallest ----
-  const tall = falls.reduce((a, b) => (b.drop > a.drop ? b : a));
+  // ---- the rainbow, in the spray of the tallest (of a free fall, where it turns to mist) ----
+  const landed = falls.filter((f) => !f.free);
+  const tall = (landed.length ? landed : falls).reduce((a, b) => (b.drop > a.drop ? b : a));
+  if (tall.free) tall.foot = { x: tall.lip.x + tall.dir.x * 12, y: tall.lip.y - tall.drop * 0.5, z: tall.lip.z + tall.dir.z * 12 };
   if (tall.drop > 45) {
     const R = Math.min(70, tall.drop * 0.55);
     const bow = new THREE.Mesh(new THREE.RingGeometry(R * 0.8, R, 40, 1, 0, Math.PI), new THREE.ShaderMaterial({

@@ -49,12 +49,21 @@ export function buildSkyways(field, pads, seed, opts = {}) {
       // on floating worlds the hidden continent's heights are meaningless over the
       // void — only count terrain where island land actually exists
       const land = !islands || islands.atWorld(x, z);
-      let h = land ? field.heightAt(x, z) : 4;
+      let h = land ? field.heightAt(x, z) : NaN;
       if (land) {
         h = Math.max(h, field.heightAt(x + ux * 8, z + uz * 8), field.heightAt(x - ux * 8, z - uz * 8));
       }
-      for (const o of obstacles) if (Math.hypot(x - o.x, z - o.z) < o.r + 14) h = Math.max(h, o.y + o.h - CLEAR * 0.5);
-      raw.push({ x, z, y: Math.max(6, h) + CLEAR });
+      for (const o of obstacles) if (Math.hypot(x - o.x, z - o.z) < o.r + 14) h = Math.max(h || 0, o.y + o.h - CLEAR * 0.5);
+      raw.push({ x, z, y: land ? Math.max(6, h) + CLEAR : NaN });
+    }
+    // (over the air: straight from where it leaves one island to where it reaches the next)
+    for (let s = 0; s <= NPTS; s++) {
+      if (!Number.isNaN(raw[s].y)) continue;
+      let a = s - 1, b = s + 1;
+      while (b <= NPTS && Number.isNaN(raw[b].y)) b++;
+      const ya = a >= 0 ? raw[a].y : (b <= NPTS ? raw[b].y : 6 + CLEAR), yb = b <= NPTS ? raw[b].y : ya;
+      for (let q = s; q < b; q++) raw[q].y = ya + (yb - ya) * ((q - a) / (b - a));
+      s = b - 1;
     }
     // two smoothing passes → a calm, believable elevated line
     for (let pass = 0; pass < 2; pass++) {

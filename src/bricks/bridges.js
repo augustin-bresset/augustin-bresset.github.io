@@ -1,10 +1,13 @@
 // bridges.js — wooden rope bridges between close floating islands in archipelago mode.
 // For each pair of islands whose closest rim points are within MAX_GAP world units,
 // a plank-and-rope bridge is strung between them following a parabolic sag (catenary
-// approximation). Geometry is flat-shaded vertex-colored, matching the rest of the world.
+// approximation) — climbing, when the two islands ride at different heights, but never
+// steeper than a rope bridge can be walked (MAX_CLIMB).
+// Geometry is flat-shaded vertex-colored, matching the rest of the world.
 import * as THREE from 'three';
 
 const MAX_GAP    = 130;   // world units; skip pairs further apart than this
+const MAX_CLIMB  = 0.5;   // rise over run, at most
 const PLANK_W    = 3.0;   // plank width across the bridge
 const PLANK_D    = 0.55;  // plank footprint depth along the bridge
 const PLANK_T    = 0.22;  // plank thickness (height)
@@ -24,22 +27,16 @@ function hash2(i, j) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-// Sample all rim points for an island (world XZ only; Y resolved later via field).
-function rimPoints(isl) {
-  const { x, z, rim } = isl;
-  return rim.map((r, s) => {
-    const th = (s / rim.length) * Math.PI * 2;
-    return { x: x + Math.cos(th) * r, z: z + Math.sin(th) * r };
-  });
-}
-
-// Find the closest pair of points between two rim arrays.
-function closestPair(pA, pB) {
+// The closest pair of points between two islands' rims that a bridge can join (not
+// too steep), keeping clear of the bridges already strung (`taken`).
+function closestPair(pA, pB, taken) {
   let dMin = Infinity, a = null, b = null;
-  for (const pa of pA) {
-    for (const pb of pB) {
-      const d = Math.hypot(pa.x - pb.x, pa.z - pb.z);
-      if (d < dMin) { dMin = d; a = pa; b = pb; }
+  for (let i = 0; i < pA.length; i += 2) {
+    const pa = pA[i];
+    if (taken.some((t) => Math.hypot(pa.x - t.x, pa.z - t.z) < 150)) continue;
+    for (let j = 0; j < pB.length; j += 2) {
+      const pb = pB[j], d = Math.hypot(pa.x - pb.x, pa.z - pb.z);
+      if (d < dMin && Math.abs(pa.y - pb.y) < d * MAX_CLIMB) { dMin = d; a = pa; b = pb; }
     }
   }
   return { a, b, dist: dMin };
@@ -47,13 +44,10 @@ function closestPair(pA, pB) {
 
 // Build one bridge mesh between rim point pa and pb.
 function makeBridgeMesh(field, pa, pb, seed) {
-  const ax = pa.x, az = pa.z;
-  const bx = pb.x, bz = pb.z;
-
-  // Anchor heights: 1.2 units above the actual terrain at each rim point (so the
-  // bridge starts just above the island edge, not clipping through the cliff).
-  const ay = Math.max(field.heightAt(ax, az) + 1.2, 3.5);
-  const by = Math.max(field.heightAt(bx, bz) + 1.2, 3.5);
+  // each end is made fast a couple of metres IN from the edge, just above the ground
+  const ax = pa.x - pa.nx * 2.2, az = pa.z - pa.nz * 2.2;
+  const bx = pb.x - pb.nx * 2.2, bz = pb.z - pb.nz * 2.2;
+  const ay = pa.y + 1.0, by = pb.y + 1.0;
 
   const dist = Math.hypot(bx - ax, bz - az);
   const sag  = dist * SAG_K;
@@ -187,26 +181,29 @@ function makeBridgeMesh(field, pa, pb, seed) {
 export function buildBridges(field, islands, seed) {
   const group = new THREE.Group();
   group.name = 'bridges';
-  if (!islands || !islands.rims || islands.rims.length < 2) return group;
+  if (!islands || islands.comps.length < 2) return group;
 
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true, flatShading: true, roughness: 0.88, metalness: 0,
     side: THREE.DoubleSide,   // bridges are seen from above AND below
   });
 
-  const rims     = islands.rims;
-  const allPts   = rims.map(rimPoints);
+  const rims = islands.comps.map((c) => c.rim);
 
   for (let i = 0; i < rims.length; i++) {
     for (let j = i + 1; j < rims.length; j++) {
-      const { a, b, dist } = closestPair(allPts[i], allPts[j]);
-      if (dist > MAX_GAP || dist < 20) continue;  // too far or islands already merged
-
-      const bSeed = (seed ^ (i * 0x4f1b + j * 0x9e37)) >>> 0;
-      const geo   = makeBridgeMesh(field, a, b, bSeed);
-      const mesh  = new THREE.Mesh(geo, mat);
-      mesh.name = 'bridge';
-      group.add(mesh);
+      // (two islands that face each other along a long channel get a second bridge,
+      // well away from the first)
+      const taken = [];
+      for (let span = 0; span < 2; span++) {
+        const { a, b, dist } = closestPair(rims[i], rims[j], taken);
+        if (!a || dist > MAX_GAP || dist < 8) break;
+        taken.push(a);
+        const bSeed = (seed ^ (i * 0x4f1b + j * 0x9e37 + span)) >>> 0;
+        const mesh = new THREE.Mesh(makeBridgeMesh(field, a, b, bSeed), mat);
+        mesh.name = 'bridge';
+        group.add(mesh);
+      }
     }
   }
 

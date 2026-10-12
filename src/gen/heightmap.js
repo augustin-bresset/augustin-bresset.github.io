@@ -168,6 +168,10 @@ export function makeField(seed, { size = 1000, N = 256, mode = 'island', relief 
 
   return {
     seed, size, half, N, verts, heights, biome, moisture, blendIds, blendW, massif, resist, idx, gx, gz, maxY, minY,
+    // the height the ground was raised by AFTER it was shaped — a floating island rides
+    // at its own level (gen/islands.js). Whatever goes by altitude (the shore, a tree
+    // line, where a lake may lie) goes by height − lift.
+    lift: null, liftAt: () => 0,
     massifAt: (wx, wz) => bilinear(massif, wx, wz),
     heightAt: (wx, wz) => bilinear(heights, wx, wz),
     moistureAt: (wx, wz) => bilinear(moisture, wx, wz),

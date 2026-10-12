@@ -40,15 +40,16 @@ export function runDown(field, x, z, { step = 5, max = 80, floor = 3 } = {}) {
 // and the land inside the shore line is dug into a basin below that. The shore is a
 // wobbling outline, not a circle.
 // avoid: [{ x, z, r }] ground that is spoken for · inside(x, z): optional land test
+// size: [least, spread] of a lake's radius (a floating island has room for a tarn, no more)
 const LAKESIDE = new Set([BIOME.PLAINS, BIOME.FOREST, BIOME.HILLS, BIOME.TAIGA, BIOME.MOOR, BIOME.JUNGLE, BIOME.SAVANNA, BIOME.PLATEAU, BIOME.MARSH]);
-export function carveLakes(field, graph, seed, { count = 3, avoid = [], inside = null } = {}) {
+export function carveLakes(field, graph, seed, { count = 3, avoid = [], inside = null, size: span = [22, 32] } = {}) {
   const { N, heights, idx, gx, gz, size, half } = field;
   const rand = mulberry32((seed ^ 0x1a4e5) >>> 0);
   const sites = graph.sites.filter((s) => LAKESIDE.has(s.biome) && Math.hypot(s.x, s.z) < 660);
   const cell = size / N, lakes = [];
-  for (let tries = 0; tries < 400 && lakes.length < count && sites.length; tries++) {
+  for (let tries = 0; tries < (inside ? 1600 : 400) && lakes.length < count && sites.length; tries++) {
     const s = sites[(rand() * sites.length) | 0];
-    const x = s.x + (rand() - 0.5) * 44, z = s.z + (rand() - 0.5) * 44, R = 22 + rand() * 32;
+    const x = s.x + (rand() - 0.5) * 44, z = s.z + (rand() - 0.5) * 44, R = span[0] + rand() * span[1];
     const lobes = [[2, 0.26 * rand(), rand() * 6.28], [3, 0.17 * rand(), rand() * 6.28], [5, 0.08 * rand(), rand() * 6.28]];
     const radius = (th) => { let r = 1; for (const [k, a, p] of lobes) r += a * Math.sin(k * th + p); return R * r; };
     if (field.massifAt(x, z) > 0.1) continue;
@@ -63,8 +64,9 @@ export function carveLakes(field, graph, seed, { count = 3, avoid = [], inside =
       if (inside && !inside(x + Math.cos(th) * r * 1.2, z + Math.sin(th) * r * 1.2)) ok = false;
     }
     // too near the sea, on a slope, or under a knoll that would have to be dug away
-    if (!ok || lo < 3.4 || lo > 70 || hi - lo > 10 || field.heightAt(x, z) > lo + 8) continue;
-    const level = lo - 0.7, depth = 3 + rand() * 4;
+    const up = field.liftAt(x, z);              // (a floating island's own level)
+    if (!ok || lo - up < 3.4 || lo - up > 70 || hi - lo > 10 || field.heightAt(x, z) > lo + 8) continue;
+    const level = lo - 0.7, depth = Math.min(R * 0.22, 3 + rand() * 4);
     const reach = Math.ceil(R * 1.75 / cell);
     const ci = Math.round((x + half) / cell), cj = Math.round((z + half) / cell);
     for (let dj = -reach; dj <= reach; dj++) for (let di = -reach; di <= reach; di++) {
@@ -97,7 +99,7 @@ export function findFalls(field, { max = 5, minDrop = 22, avoid = [], inside = n
   const cands = [];
   for (let j = 2; j < N - 1; j++) for (let i = 2; i < N - 1; i++) {
     const k = idx(i, j), h = heights[k];
-    if (h < 16 || accum[k] < 9) continue;
+    if (h - (field.lift ? field.lift[k] : 0) < 16 || accum[k] < 9) continue;
     let c = k, steps = 0;
     while (steps < 4 && receiver[c] >= 0) { c = receiver[c]; steps++; }
     const drop = h - heights[c];
@@ -120,7 +122,7 @@ export function findFalls(field, { max = 5, minDrop = 22, avoid = [], inside = n
     let c = cand.k, steps = 0;
     while (steps < 12 && receiver[c] >= 0 && (steps < 2 || heights[c] - heights[receiver[c]] > 4.6)) { c = receiver[c]; steps++; }   // (steeper than 40°: falling, not running)
     const foot = at(c);
-    if (lip.y - foot.y < minDrop || foot.y < 0.5 || (inside && !inside(foot.x, foot.z))) continue;
+    if (lip.y - foot.y < minDrop || foot.y - field.liftAt(foot.x, foot.z) < 0.5 || (inside && !inside(foot.x, foot.z))) continue;
     falls.push({ lip, foot, drop: lip.y - foot.y, flow: accum[cand.k] });
   }
   return falls;
@@ -161,7 +163,7 @@ export function traceLava(field, crater) {
   const flows = [];
   for (const [swing, len, width] of [[0, 78, 1], [0.55, 40, 0.62], [-0.6, 46, 0.7]]) {
     const th = lip.th + swing, d = lip.d + (swing ? 12 : 3);
-    const pts = runDown(field, x + Math.cos(th) * d, z + Math.sin(th) * d, { step: 5, max: len, floor: 4 });
+    const pts = runDown(field, x + Math.cos(th) * d, z + Math.sin(th) * d, { step: 5, max: len, floor: 4 + field.liftAt(x, z) });
     if (pts.length < 8) continue;
     if (!swing) pts.unshift({ x: x + Math.cos(th) * (lip.d - 6), z: z + Math.sin(th) * (lip.d - 6), y: level });   // it starts in the lake
     flows.push({ pts, width });

@@ -76,7 +76,8 @@ export function planScatter(field, slope, hydro, seed, exclusions = [], trend = 
     for (let i = 1; i < N; i++) {
       const k = idx(i, j);
       const b = biome[k];
-      const y = heights[k];
+      const up = field.lift ? field.lift[k] : 0;       // (a floating island's own level)
+      const y = heights[k] - up;
       const cx = gx(i), cz = gz(j);
       if (cx * cx + cz * cz > SCATTER_R2) continue;
 
@@ -123,7 +124,7 @@ export function planScatter(field, slope, hydro, seed, exclusions = [], trend = 
             if (rec.wood && rand() < 0.016) tree.scale = 2.3 + rand() * 1.2;
           } else if (kind === 'conifer') {
             // frosted as they near the tree line, and stunted
-            const high = smoothstep(treeLine - 34, treeLine + 4, yy);
+            const high = smoothstep(treeLine - 34, treeLine + 4, yy - up);
             tree.frost = high * (0.5 + 0.5 * rand());
             tree.scale *= 1 - 0.3 * high;
             if (massif[k] > 0.1 && rand() < 0.3) tree.tone = 'dark';
@@ -165,7 +166,8 @@ export function planScatter(field, slope, hydro, seed, exclusions = [], trend = 
         const tx = q.x - p.x, tz = q.z - p.z, tl = Math.hypot(tx, tz) || 1;
         const wx = p.x - (tz / tl) * side * off + (rand() - 0.5) * 2, wz = p.z + (tx / tl) * side * off + (rand() - 0.5) * 2;
         const yy = field.heightAt(wx, wz);
-        if (yy > 1 && yy < 60 && !excluded(wx, wz)) {
+        const above = yy - field.liftAt(wx, wz);
+        if (above > 1 && above < 60 && !excluded(wx, wz)) {
           reeds.push({ x: wx, y: yy, z: wz, scale: 0.7 + rand() * 0.6, rot: rand() * Math.PI * 2, tint: rand() });
         }
       }

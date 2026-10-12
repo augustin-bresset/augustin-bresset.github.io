@@ -118,7 +118,7 @@ export function buildLife(field, graph, seed, { exclusions = [], islands = null,
   const places = {};                                        // where each curiosity ended up (name → { x, y, z })
   const tall = [];                                          // what stands high enough to be flown or piped INTO: { x, y, z, r, h }
   const rises = (at, r, h) => tall.push({ x: at.x, y: at.y, z: at.z, r, h });
-  const free = (x, z, r = 0) => taken.every((e) => Math.hypot(x - e.x, z - e.z) > e.r + r) && (!islands || islands.atWorld(x, z));
+  const free = (x, z, r = 0) => taken.every((e) => Math.hypot(x - e.x, z - e.z) > e.r + r) && (!islands || islands.atWorld(x, z, 8 + r * 0.5));
   const flat = (x, z, reach = 8) => {
     const h = field.heightAt(x, z);
     return Math.max(Math.abs(field.heightAt(x + reach, z) - h), Math.abs(field.heightAt(x - reach, z) - h),
@@ -132,7 +132,8 @@ export function buildLife(field, graph, seed, { exclusions = [], islands = null,
     for (let tries = 0, found = 0; tries < 40 * of && found < of && sites.length; tries++) {
       const s = sites[(rand() * sites.length) | 0];
       const x = s.x + (rand() - 0.5) * 44, z = s.z + (rand() - 0.5) * 44, y = field.heightAt(x, z);
-      if (!biomes.includes(field.biomeAt(x, z)) || y < minY || y > maxY) continue;
+      const up = y - field.liftAt(x, z);          // (above its island's own level, if it floats)
+      if (!biomes.includes(field.biomeAt(x, z)) || up < minY || up > maxY) continue;
       if (!free(x, z, room) || flat(x, z, room * 0.6) > level || (where && !where(x, z))) continue;
       found++;
       if (!best || y > best.y) best = { x, z, y };
@@ -532,7 +533,7 @@ export function buildLife(field, graph, seed, { exclusions = [], islands = null,
   // the REFUGE at the top of the island: a hut, a cairn, a flag in the wind
   {
     const { x, y, z } = graph.massif.peak;
-    if (y > 80 && !graph.massif.crater && (!islands || islands.atWorld(x, z))) {       // (nobody winters on a crater's rim)
+    if (y - field.liftAt(x, z) > 80 && !graph.massif.crater && (!islands || islands.atWorld(x, z))) {       // (nobody winters on a crater's rim)
       places.refuge = { x, y, z };
       const top = new THREE.Group(); top.position.set(x, y - 0.6, z);
       top.add(prop(boxes([[2.6, 1.8, 2.2, 0, 0.9, 0], [3.0, 0.3, 2.6, 0, 1.95, 0, 0.5], [0.5, 0.9, 0.1, 0.4, 0.6, 1.11, 0.3]]), 0xb85a3a, { vertexColors: true }));
