@@ -19,10 +19,10 @@ export const LANG = {
       helpGotIt: 'Got it',
       helpItems: [
         'Click a glowing settlement to dive in — "Back to the map" (top-left) returns you to the overview.',
-        'Drag to orbit or pan the view; scroll or pinch to zoom.',
+        'Drag to move over the map; Shift-drag (or right-drag) to turn the view and tilt it up toward the summits; scroll or pinch to zoom.',
         'Inside a settlement, click a glowing marker to read a short note about it.',
         'A lit window or doorway is a portal — click it to jump elsewhere.',
-        'Top-right: switch between worlds, or the language. The list on the left jumps straight to any settlement.',
+        'Top-right: another island with the next climate, or the next shape of mountains (from the roundest to the sharpest); switch between worlds, or the language. The list on the left jumps straight to any settlement.',
       ],
     },
     fr: {
@@ -37,10 +37,10 @@ export const LANG = {
       helpGotIt: 'Compris',
       helpItems: [
         'Cliquez un lieu lumineux pour vous y plonger — « Retour à la carte » (en haut à gauche) vous ramène à la vue d’ensemble.',
-        'Glissez pour tourner ou déplacer la vue ; molette ou pincement pour zoomer.',
+        'Glissez pour vous déplacer sur la carte ; Maj+glisser (ou clic droit) pour tourner la vue et la relever vers les sommets ; molette ou pincement pour zoomer.',
         'Dans un lieu, cliquez un marqueur lumineux pour lire une petite note.',
         'Une fenêtre ou une porte lumineuse est un portail — cliquez pour voyager ailleurs.',
-        'En haut à droite : changez de monde ou de langue. La liste à gauche mène directement à un lieu.',
+        'En haut à droite : une autre île au climat suivant, ou au relief suivant (des montagnes les plus rondes aux plus piquées) ; changez de monde ou de langue. La liste à gauche mène directement à un lieu.',
       ],
     },
   },

@@ -11,7 +11,7 @@ import { Navigation } from './src/navigation.js';
 import { LANG, cityLabel } from './src/lang.js';
 import { createOutline } from './src/postfx.js';
 import { ACTIVE, setTheme } from './src/themes.js';
-import { resolveWorld, nextWorld, worldName } from './src/worlds.js';
+import { resolveWorld, nextWorld, worldName, climateName, nextClimate, reliefName, nextRelief } from './src/worlds.js';
 import { portalRender } from './src/portalRender.js';
 
 const container = document.getElementById('viewport');
@@ -50,11 +50,25 @@ function boot() {
   // world. goToWorld() briefly puts the seed back to pass it to the next page load,
   // which then strips it again — so the "same place, different style" switch works
   // for one hop without permanently locking the seed in the address bar.
-  if (urlSeed != null) {
+  if (urlSeed != null || qp.has('trend') || qp.has('relief')) {
     const clean = new URLSearchParams(location.search);
-    clean.delete('seed');
+    clean.delete('seed'); clean.delete('trend'); clean.delete('relief');   // (a forced climate or relief is for one visit too)
     const qs = clean.toString();
     history.replaceState(null, '', qs ? '?' + qs : location.pathname + location.hash);
+  }
+
+  // ?stats: a small readout of what each frame costs (frame rate, time spent animating,
+  // draw calls and triangles over all passes) — the first thing to look at when it lags
+  if (qp.has('stats')) {
+    const box = document.createElement('pre');
+    box.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:500;margin:0;padding:6px 9px;font:11px/1.35 ui-monospace,monospace;' +
+      'color:#f4efe2;background:rgba(44,26,14,.78);border-radius:4px;pointer-events:none';
+    document.body.appendChild(box);
+    window.__stats = stage.stats;
+    setInterval(() => {
+      const s = stage.stats;
+      box.textContent = `${s.fps.toFixed(0)} fps · ${s.ms.toFixed(1)} ms\nanim ${s.update.toFixed(1)} ms\n${s.calls} draws\n${(s.triangles / 1000).toFixed(0)}k tris\n×${s.pixelRatio.toFixed(2)} px`;
+    }, 500);
   }
 
   // initial language: ?lang= override, else browser preference (FR for francophones)
@@ -189,14 +203,36 @@ function boot() {
   // Initialise the portal render target BEFORE buildWorld so the texture reference
   // exists when makePortal() attaches it to the disc material inside each city build.
   portalRender.init(stage.renderer, stage.scene);
-  const worldObj = buildWorld(stage, seed, { mode: world.mode });
+  const worldObj = buildWorld(stage, seed, { mode: world.mode, trend: qp.get('trend'), relief: qp.get('relief') });
   stage.scene.add(worldObj.group);
+
+  // the climate and relief buttons: each names what this island has, and goes to
+  // another island with the next one (keeping the other as it is)
+  const another = (trend, relief) => {
+    const p = new URLSearchParams(location.search);
+    p.set('trend', trend); p.set('relief', relief); p.set('lang', LANG.current);
+    location.search = p.toString();
+  };
+  const dial = (btn, name, title, go) => {
+    if (!btn) return;
+    const label = () => { btn.textContent = name(LANG.current); btn.title = title[LANG.current] || title.en; };
+    label(); onLang.push(label);
+    btn.style.display = 'flex'; btn.classList.add('is-on');
+    btn.addEventListener('click', go);
+  };
+  dial(ui.climeBtn, (lang) => climateName(worldObj.trend, lang),
+    { fr: 'Une autre île, un autre climat', en: 'Another island, another climate' },
+    () => another(nextClimate(worldObj.trend), worldObj.relief));
+  dial(ui.reliefBtn, (lang) => reliefName(worldObj.relief, lang),
+    { fr: 'Une autre île, d’autres montagnes (des plus rondes aux plus piquées)', en: 'Another island, other mountains (from the roundest to the sharpest)' },
+    () => another(worldObj.trend, nextRelief(worldObj.relief)));
 
   const reduceMotion = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const rig = new CameraRig(container, WORLD.half);
   if (reduceMotion) rig.idleDrift = false;
+  rig.ground = worldObj.field.ceilingAt;
   // open the home view toward the generated mountain mass (computed in world.js) so
   // there are always real mountains on the horizon ahead.
   if (worldObj.scenicAzimuth != null) {
@@ -226,6 +262,7 @@ function boot() {
   }
 
   const nav = new Navigation(stage, rig, worldObj, ui);
+  if (qp.has('stats')) window.__dev = { stage, rig, world: worldObj, nav, portalRender };   // console access while profiling
   document.getElementById('note-close').addEventListener('click', () => nav.closeNote());
   ui.buildLegend(worldObj.cities, (id) => nav.diveTo(id));
 
@@ -253,9 +290,12 @@ function boot() {
   stage.onFrame((t, dt) => {
     rig.update(t, dt);
     for (const u of worldObj.updaters) u(stillT ?? t, dt);
+    worldObj.tickCities(stillT ?? t, dt, rig.camera, container.clientHeight);
     nav.tick();                       // keep an open field-note pinned to its marker
   });
 
+  portalRender.detailMask = (eye) => worldObj.detailMask(eye, container.clientHeight);
+  stage.warm(WORLD.half * 1.6);       // pay for every upload and shader now, not mid-dive
   stage.start();
 
   // deep-link straight into a project, e.g. ?focus=toaster (optionally &poi=ensta)

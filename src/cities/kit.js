@@ -238,6 +238,7 @@ function makePortalWindowMaterial() {
       uTex:      { value: portalRender.texture },
       uRes:      { value: portalRender.resolution },   // live Vector2, updated each frame
       uExposure: { value: ACTIVE.exposure },
+      uLive:     portalRender.live,                    // shared: 0 while the window sleeps
     },
     vertexShader: /* glsl */`
       void main() {
@@ -248,6 +249,7 @@ function makePortalWindowMaterial() {
       uniform sampler2D uTex;
       uniform vec2  uRes;
       uniform float uExposure;
+      uniform float uLive;
 
       // three.js ACESFilmicToneMapping, replicated so the window matches the scene.
       vec3 RRTAndODTFit(vec3 v) {
@@ -274,6 +276,8 @@ function makePortalWindowMaterial() {
                    c * 12.92, step(c, vec3(0.0031308)));
       }
       void main() {
+        // asleep (seen from the map, or from another city): a soft sky-lit glow
+        if (uLive < 0.5) { gl_FragColor = vec4(0.84, 0.90, 0.88, 1.0); return; }
         vec2 uv = gl_FragCoord.xy / uRes;
         vec3 col = texture2D(uTex, uv).rgb;   // linear scene radiance
         gl_FragColor = vec4(linearToSRGB(ACESFilmic(col)), 1.0);

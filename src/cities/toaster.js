@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { box, cyl, glow, strip, wireBox, pointCloud, makeLabel, makeWallPortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
 import { Simplex } from '../gen/noise.js';
+import { Fabric } from './urban.js';
 
 const WEDGE = 5;                              // the never-labelled sector (hosts the portal)
 const GREY_IN = 0x454c56, GREY_OUT = 0x30353d;
@@ -55,7 +56,23 @@ export function build() {
   }
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
   const unitEdges = new THREE.EdgesGeometry(boxGeo);
+  // what makes the scan-grid a CITY: windows on the monoliths, traffic on the ring
+  // avenues between them, people, drones — all in the tool's charcoal and red
+  const fab = new Fabric({
+    seed: 2202, windowLit: [0xff6a4a, 0xffb07a, 0xe8e2d8, 0xff3b2e], windowOff: 0x1b1f25, litP: 0.2,
+    floorH: 1.5, bay: 1.0, cars: [0x15181d, 0x2a2f37, RED, 0xcfd3d8], people: [0x8a94a2, 0xcfd3d8, RED, 0x54423f],
+    lamp: 0xff5a3c, pole: 0x23272d,
+  });
   const labelTowers = [];          // vivid inner towers → the 'clustering' note anchor
+  // The grid is a few hundred identical boxes: drawn as ONE instanced mesh per ring
+  // band (they share its material) and ONE line mesh per sector (they share its neon)
+  const bandBoxes = RINGS.map(() => []), sectorEdges = outlineMats.map(() => []);
+  const _box = new THREE.Object3D(), _p = new THREE.Vector3();
+  const boxMatrix = (x, y, z, w, h, d, th) => {
+    _box.position.set(x, y, z); _box.scale.set(w, h, d); _box.rotation.set(0, -th, 0);
+    _box.updateMatrix();
+    return _box.matrix;
+  };
 
   for (let k = 0; k < RINGS.length; k++) {
     const r = RINGS[k];
@@ -75,22 +92,41 @@ export function build() {
       const d = k <= 1 ? 2.5 : k <= 3 ? 2.2 : 2.3;
       const hh = k <= 3 && k >= 2 ? h * 0.8 : h;
 
-      const m = new THREE.Mesh(boxGeo, bandMats[k]);
-      m.scale.set(w, hh, d); m.position.set(x, hh / 2, z); m.rotation.y = -th;
-      m.castShadow = k <= 3; m.receiveShadow = true;
-      g.add(m);
-      if (si <= 1 && k <= 1) labelTowers.push(m);          // → 'clustering' anchors
+      if (si <= 1 && k <= 1) {                             // → 'clustering' anchors: meshes of their own
+        const m = new THREE.Mesh(boxGeo, bandMats[k]);
+        m.scale.set(w, hh, d); m.position.set(x, hh / 2, z); m.rotation.y = -th;
+        m.castShadow = true; m.receiveShadow = true;
+        g.add(m);
+        labelTowers.push(m);
+      } else bandBoxes[k].push(boxMatrix(x, hh / 2, z, w, hh, d, th).clone());
+      if (k <= 4) fab.windowsOn(x, 0, z, w, d, hh, -th, { faces: k <= 2 ? [0, 1, 2, 3] : [1, 3] });
+      if (k <= 1 && j % 3 === 0) fab.light(x, hh + 0.2, z, RED, 0.34, 1.7, j * 0.13);     // rooftop beacons
 
       // the red annotation outline, dormant until the sweep ignites its sector.
       // The grey wedge NEVER gets one — its data is still group_id = −1.
       if (si !== WEDGE && k <= 3) {
-        const ol = new THREE.LineSegments(unitEdges, outlineMats[si]);
-        ol.scale.set(w + 0.5, hh + 0.5, d + 0.5);
-        ol.position.set(x, hh / 2 + 0.05, z); ol.rotation.y = -th;
-        g.add(ol);
+        const mtx = boxMatrix(x, hh / 2 + 0.05, z, w + 0.5, hh + 0.5, d + 0.5, th);
+        const edge = unitEdges.attributes.position;
+        for (let v = 0; v < edge.count; v++) {
+          _p.fromBufferAttribute(edge, v).applyMatrix4(mtx);
+          sectorEdges[si].push(_p.x, _p.y, _p.z);
+        }
       }
     }
   }
+  bandBoxes.forEach((list, k) => {
+    if (!list.length) return;
+    const mesh = new THREE.InstancedMesh(boxGeo, bandMats[k], list.length);
+    list.forEach((mtx, i) => mesh.setMatrixAt(i, mtx));
+    mesh.castShadow = k <= 3; mesh.receiveShadow = true;
+    g.add(mesh);
+  });
+  sectorEdges.forEach((pos, si) => {
+    if (!pos.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.add(new THREE.LineSegments(geo, outlineMats[si]));
+  });
 
   // ===== ground scan-rings (red → slate by radius) + radial spokes ==============
   const ringMeshes = [];
@@ -201,6 +237,22 @@ export function build() {
   const label = makeLabel('Toaster', '3D Annotation', '#e10600');
   label.sprite.position.set(0, 44, 0); g.add(label.sprite);
 
+  // the avenues are the gaps between the scan rings
+  for (const r of [29, 37.5]) {
+    fab.ring(r, 2.5, 0x23272d);
+    fab.traffic({ ring: r }, { n: r > 30 ? 10 : 8, speed: 5.2, lane: 0.55, w: 0.8, h: 0.6, l: 1.7 });
+  }
+  fab.walkers({ ring: 21.5 }, { n: 16, spread: 1.0 });
+  fab.walkers({ ring: 15 }, { n: 10, spread: 0.8 });
+  for (let s = 0; s < 8; s++) for (const r of [21.5, 29, 37.5]) {
+    const a = s * SEC_W + 0.09; fab.lamp(Math.cos(a) * r, Math.sin(a) * (r), 2.8);
+  }
+  // annotation drones patrolling above the rooftops
+  fab.traffic({ ring: 16 }, { n: 4, speed: 6, lane: 0, y: 21, w: 0.6, h: 0.3, l: 0.6, colors: [RED, 0xcfd3d8] });
+  fab.traffic({ ring: 30 }, { n: 6, speed: 7, lane: 0, y: 13.5, w: 0.6, h: 0.3, l: 0.6, colors: [RED, 0xcfd3d8] });
+  const fabric = fab.build();
+  g.add(fabric.group);
+
   tagPickable(g, 'toaster');
 
   return {
@@ -210,6 +262,7 @@ export function build() {
     update(t) {
       portal.update(t);
       for (const p of pois) p.beacon.update(t);
+      fabric.update(t);
 
       // the segmenter sweep: as the red blade crosses a sector, that sector's neon
       // outlines IGNITE around its buildings, then decay behind the beam

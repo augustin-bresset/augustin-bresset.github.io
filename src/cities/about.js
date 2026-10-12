@@ -12,6 +12,7 @@
 // air alive. ONE organizing rule: everything sits on (or flanks) the shaft path.
 import * as THREE from 'three';
 import { box, cyl, wireBox, pointCloud, makeLabel, makeWallPortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
+import { Fabric, district, GROUND } from './urban.js';
 
 const WOOD = 0x7a5230, DWOOD = 0x5c3d20, CANVAS = 0xeadfc6, CANVAS2 = 0xe4cfa0;
 const RUST = 0xc4763a, ROPE = 0xb8a274, LEAF = 0x6b9a47, WARM = 0xffd98a;
@@ -528,6 +529,37 @@ export function build() {
   const label = makeLabel('Origin', 'The Inventor', '#c4763a');
   label.sprite.position.set(0, 44, 0); g.add(label.sprite);
 
+  // ===== THE REST OF THE VILLAGE — the far side of the mill was bare hillside: now
+  // lanes of cottages with their chimneys smoking, a market at the mill's foot, and
+  // the villagers going about along the shaft street.
+  const street = [];
+  for (let i = 0; i <= 30; i++) street.push(pathAt(0.03 + (i / 30) * 0.94));
+  const offStreet = (x, z) => street.reduce((m, p) => Math.min(m, Math.hypot(x - p.x, z - p.z)), Infinity);
+  const fab = new Fabric({
+    seed: 31, walls: cotWalls, roof: 'gable', roofs: [0x8a5a34, 0x6e4526, 0x7a4a2c], trim: ROPE, pavement: 0xc8b792,
+    windowLit: [WARM, 0xffe9b8], windowOff: 0x4a3a28, litP: 0.55, floorH: 1.9, bay: 1.6,
+    people: [RUST, LEAF, CANVAS, 0x3a7ca5, 0xb5402f, 0x5b4a8f], leaves: [LEAF, 0x5a8a3f], trunk: DWOOD,
+  });
+  const firstCottage = fab.bodies.length;
+  district(fab, {
+    R: 43, angle: 0.5, block: 9.2, street: 3.0,
+    keep: (x, z, r) => r > 16 && offStreet(x, z) > 19.5,
+    height: () => 3.5, o: { shop: false },
+  });
+  fab.bodies.slice(firstCottage).forEach((b, i) => { if (i % 4 === 0) fab.smoke(b.x + 0.6, b.y + b.h + 1.8, b.z, 3); });
+  // market day at the foot of the mill, on its open side
+  const stalls = [];
+  for (let k = 0; k < 6; k++) {
+    const a = 0.25 + k * 0.3, x = Math.cos(a) * 12.2, z = Math.sin(a) * 12.2, rot = Math.PI / 2 - a;
+    fab.prop(x, GROUND, z, 1.9, 0.9, 1.2, WOOD, rot);
+    fab.prop(x, GROUND + 2.0, z, 2.4, 0.12, 1.8, [RUST, CANVAS2, 0x6b9a47, 0x3a7ca5][k % 4], rot);
+    stalls.push([x, z]);
+  }
+  fab.crowd(16, (i, rand) => { const [x, z] = stalls[i % stalls.length]; return [x * 0.86 + (rand() - 0.5) * 1.4, z * 0.86 + (rand() - 0.5) * 1.4]; }, { roam: 0.6 });
+  fab.walkers({ pts: street.map((p) => [p.x, p.z]) }, { n: 18, spread: 2.6, speed: 0.8 });
+  const fabric = fab.build();
+  g.add(fabric.group);
+
   tagPickable(g, 'about');
 
   const PULSE_PERIOD = 22;      // seconds for the power (time) to run 2022 → now
@@ -538,6 +570,7 @@ export function build() {
     update(t, dt) {
       portal.update(t);
       for (const p of pois) p.beacon.update(t);
+      fabric.update(t);
 
       // the windmill turns everything
       rotor.rotation.z = t * 0.5;

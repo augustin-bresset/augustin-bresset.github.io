@@ -16,7 +16,18 @@ export class Navigation {
     this.byId = Object.fromEntries(world.cities.map((c) => [c.id, c]));
 
     this.ray = new THREE.Raycaster();
+    this.ray.layers.enableAll();     // detail lives on its own layers (world.js): still clickable
     this.ndc = new THREE.Vector2();
+    // On the map only ONE thing can be picked: which settlement. So the pointer is
+    // tested against one plain cylinder per city, not against the thousands of meshes
+    // the cities are made of (that test ran on every pointer move).
+    this.proxies = world.cities.map((c) => {
+      const h = 40, m = new THREE.Mesh(new THREE.CylinderGeometry(c.radius * 0.86, c.radius * 0.86, h, 20));
+      m.position.copy(c.worldPos); m.position.y += h / 2 - 2;
+      m.userData.cityId = c.id; m.updateMatrixWorld();
+      return m;
+    });
+    this._moved = null;              // the last pointer move, handled once per frame (see tick)
     this._v = new THREE.Vector3();
     this._w = new THREE.Vector3();
     this.hovered = null;             // overview: hovered city
@@ -62,7 +73,11 @@ export class Navigation {
       -((e.clientY - r.top) / r.height) * 2 + 1
     );
     this.ray.setFromCamera(this.ndc, this.rig.camera);
-    const hits = this.ray.intersectObjects(this.cityGroups, true);
+    if (this.state !== 'city') {
+      const hit = this.ray.intersectObjects(this.proxies, false)[0];
+      return { cityId: hit ? hit.object.userData.cityId : null, portal: false, poi: null, zone: null, portalPoint: null, portalNormal: null };
+    }
+    const hits = this.ray.intersectObject(this.activeCity.group, true);
     for (const h of hits) {
       let o = h.object, cityId = null, portal = false, poi = null, zone = null, portalNormal = null;
       while (o) {
@@ -90,7 +105,9 @@ export class Navigation {
     return { cityId: null, portal: false, poi: null, zone: null, portalPoint: null, portalNormal: null };
   }
 
-  _onMove(e) {
+  _onMove(e) { this._moved = e; }
+
+  _hover(e) {
     const cursor = this.stage.renderer.domElement.style;
     if (this.state === 'overview') {
       const { cityId } = this._pick(e);
@@ -191,6 +208,7 @@ export class Navigation {
 
   // re-pin the open note each frame (camera can orbit in-city). Called from the render loop.
   tick() {
+    if (this._moved) { this._hover(this._moved); this._moved = null; }
     if (this.state !== 'city' || !this.openPoiId) return;
     const poi = this._poiById[this.openPoiId];
     if (!poi) return;
@@ -242,6 +260,10 @@ export class Navigation {
     });
     if (wall) portalRender.setWallPortal(wall.c, wall.n);
     else portalRender.clearWallPortal();
+    // wake this city's portal window (it sleeps on the map — see portalRender)
+    const panes = [];
+    city.group.traverse((o) => { if (o.userData.isPortalDisc) panes.push(o); });
+    portalRender.setActive(panes);
     this._poiById = Object.fromEntries((city.pois || []).map((p) => [p.id, p]));
     this._hoverPoi = null;
     this._hoverZone = null;
@@ -292,6 +314,7 @@ export class Navigation {
     this.ui.setBack(false);
     this.ui.hideCityLinks();
     portalRender.clearWallPortal();   // overview discs go back to the plain lift view
+    portalRender.setActive([]);       // …and the window goes back to sleep
     this.activeCity = null;
     this._poiById[this._hoverPoi]?.hoverZone?.(null);
     this._poiById = {};
@@ -404,6 +427,7 @@ export class Navigation {
     this.rig._pol  = this.rig.polar   = pol;
     this.rig._rad  = this.rig.radius  = radius;
     this.rig.apply();   // camera now sits exactly where the window showed → invisible cut
+    portalRender.setActive([]);   // through: nobody is looking at a pane any more
 
     // Phase 4 — settle to the overview. Continuous motion from the matched frame.
     const h = this.rig.home;

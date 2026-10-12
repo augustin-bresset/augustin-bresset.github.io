@@ -20,6 +20,7 @@
 import * as THREE from 'three';
 import { box, cyl, glow, strip, wireBox, pointCloud, makeLabel, makeWallPortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
 import { Simplex, clamp } from '../gen/noise.js';
+import { Fabric, district, GROUND } from './urban.js';
 
 const PAPER = 0xd8d2c2, CHAR = 0x3a4a5e, DARK = 0x28323e;
 const OCHRE = 0xdda42a, STEEL = 0x6b7a88, STEEL_L = 0x93a0ab, DROP = 0x5b6472;
@@ -401,6 +402,63 @@ export function build() {
   const label = makeLabel('Apairo', 'Robotics Data', '#9a6f12');
   label.sprite.position.set(0, 76, 0); g.add(label.sprite);
 
+  // ===== THE CITY — the people the factory runs on: two neighbourhoods east of the
+  // ring (the works to the north, the foundry to the south), blocks in the far
+  // corners, a garden inside the ring, lorries on the avenues, a block going up.
+  const fab = new Fabric({
+    seed: 1203, walls: [0xd8d2c2, 0xc5cbd1, 0xaab4bd, 0xe6e0d0, 0xb9c0c8], roof: 'flat', trim: STEEL, pavement: 0xc4bdac,
+    windowLit: [0xffd27a, 0xffe6a8, 0xf3c15a], windowOff: CHAR, litP: 0.36, floorH: 2.0, bay: 1.9,
+    awnings: [OCHRE, 0x44aa99, 0xcc6677, 0x88ccee],
+    cars: [OCHRE, CHAR, STEEL_L, 0xf0ece3, 0xcc6677], leaves: [0x6f9a5a, 0x5c8a52],
+  });
+  const BLOCK = 10.5;
+  const builtOn = (x, z, r) => r > 43
+    && !(x < -10 && Math.abs(z) < 47)                          // the intake, the towers, the freight
+    && !(x > -31 && x < 25 && z > 29 && z < 68)                // the works + the view lot
+    && !(Math.abs(x) < 20 && z < -29)                          // the foundry and its silos
+    && !(x > 28 && Math.abs(z) < 16)                           // observatory, lab, the way out
+    && !(x > 10 && x < 51 && Math.abs(Math.abs(z) - 23.5) < 8) // the freight east of the ring
+    && Math.hypot(x - 54, z + 13) > 10;                        // the terrace
+  const SITE = [36.75, -47.25];                                // one block left empty: a building going up
+  district(fab, {
+    R: 72, block: BLOCK, street: 3.3,
+    keep: (x, z, r) => builtOn(x, z, r) && Math.hypot(x - SITE[0], z - SITE[1]) > 4,
+    // lower toward the dive camera (azimuth 0.5), a skyline behind
+    height: (x, z) => { const front = x * 0.48 + z * 0.88; return front > 34 ? 6 : front > -20 ? 11 : 17; },
+  });
+  // lorries loop the streets of each neighbourhood (street lines run between blocks)
+  const s0 = BLOCK * 2.5, s1 = BLOCK * 4.5, s2 = BLOCK * 3.5;
+  for (const sgn of [1, -1]) {
+    fab.traffic({ pts: [[s0, sgn * s2], [s1, sgn * s2], [s1, sgn * (s2 + BLOCK)], [s0, sgn * (s2 + BLOCK)]], closed: true },
+      { n: 6, speed: 3.6, l: 2.5, w: 1.1, h: 1.0, lane: 0.7 });
+    fab.walkers({ pts: [[s0, sgn * s2], [s1, sgn * s2], [s1, sgn * (s2 + BLOCK)], [s0, sgn * (s2 + BLOCK)]], closed: true }, { n: 10, side: 1.35, spread: 0.3 });
+    for (let k = 0; k < 4; k++) fab.lamp(s0 + 2 + k * 6, sgn * (s2 + 1.4));
+  }
+  // the garden inside the ring: two rounds of trees between the clock and the road
+  for (const [r, n] of [[20, 14], [27, 20]]) for (let k = 0; k < n; k++) {
+    const a = (k + (r > 21 ? 0.5 : 0)) / n * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (x < -8 && Math.abs(z) < 14) continue;                 // the lanes come in here
+    if (x > 12 && Math.abs(Math.abs(z) - 23.5) < 6) continue; // freight
+    fab.tree(x, z, 1.5);
+  }
+  fab.walkers({ ring: 17 }, { n: 10, spread: 1.2 });
+  fab.crowd(8, (i, rand) => [54 + (rand() - 0.5) * 9, -13 + (rand() - 0.5) * 9], { roam: 0.7 });   // apéro on the terrace
+  const fabric = fab.build();
+  g.add(fabric.group);
+
+  // the building going up: a frame of floors and a tower crane turning over it
+  const site = new THREE.Group(); site.position.set(SITE[0], GROUND, SITE[1]); g.add(site);
+  site.add(box(7.4, 0.3, 7.4, 0xc4bdac, { pos: [0, 0, 0], roughness: 0.9 }));
+  for (let f = 0; f < 4; f++) {
+    for (const [dx, dz] of [[-2.6, -2.6], [2.6, -2.6], [-2.6, 2.6], [2.6, 2.6]]) site.add(box(0.4, 2.6, 0.4, STEEL_L, { pos: [dx, 1.4 + f * 2.6, dz] }));
+    site.add(box(6.2, 0.3, 6.2, 0xb9c0c8, { pos: [0, 2.8 + f * 2.6, 0], roughness: 0.9 }));
+  }
+  site.add(box(0.7, 22, 0.7, OCHRE, { pos: [4.6, 11, 4.6], roughness: 0.6 }));
+  const jib = new THREE.Group(); jib.position.set(4.6, 22, 4.6); site.add(jib);
+  jib.add(box(15, 0.5, 0.5, OCHRE, { pos: [4.5, 0.4, 0], roughness: 0.6 }), box(1.6, 1.4, 1.4, CHAR, { pos: [-3.6, 0.2, 0] }));
+  const hook = new THREE.Group(); jib.add(hook);
+  hook.add(box(0.08, 1, 0.08, STEEL, { pos: [0, -0.5, 0], cast: false }), box(1.4, 0.9, 1.4, 0xb9c0c8, { pos: [0, -1.4, 0] }));
+
   tagPickable(g, 'apairo');
 
   return {
@@ -412,6 +470,11 @@ export function build() {
     update(t) {
       portal.update(t);
       for (const p of pois) p.beacon.update(t);
+      // the city: its fabric, and the crane swinging a slab up onto the frame
+      fabric.update(t);
+      jib.rotation.y = Math.sin(t * 0.16) * 1.9;
+      const reach = 6 + Math.sin(t * 0.23) * 4.5, drop = 5 + (0.5 + 0.5 * Math.sin(t * 0.37)) * 9;
+      hook.position.x = reach; hook.children[0].scale.y = drop; hook.children[1].position.y = -drop - 0.4;
 
       const cyc = Math.floor(t / CYCLE);
       const p = (t % CYCLE) / CYCLE;

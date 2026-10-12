@@ -22,7 +22,7 @@ export class CameraRig {
     // terrain runs off to a hazy horizon with natural mountains on the skyline,
     // instead of ending at a chunked edge. A pure top-down diorama can't frame a
     // horizon at all (the skyline sits above the top of frame).
-    this.polar = THREE.MathUtils.degToRad(70); // oblique, tilted toward the horizon
+    this.polar = THREE.MathUtils.degToRad(72); // oblique, tilted toward the horizon
     this.radius = worldRadius * 0.95;          // immersed, not a far overview
 
     this.minRadius = 70;
@@ -32,7 +32,10 @@ export class CameraRig {
     // roam to every settlement but never out toward where the edge would be.
     this.maxRadius = worldRadius * 1.02;
     this.minPolar = THREE.MathUtils.degToRad(45);
-    this.maxPolar = THREE.MathUtils.degToRad(74);
+    this.maxPolar = THREE.MathUtils.degToRad(84);   // low enough to look UP at the massif
+    // …and as the view tilts up from the map toward the horizon it WIDENS, so a summit
+    // that stood out of frame comes into it (degrees added to the field of view)
+    this._lift = 0;
 
     this.idleDrift = true;       // slow auto-rotation when not interacting
     this.idleSpeed = 0.012;      // rad/sec
@@ -43,6 +46,10 @@ export class CameraRig {
     this._pol = this.polar;
     this._rad = this.radius;
     this._tgt = this.target.clone();
+
+    // the height nothing may sink below at (x, z) — the land's ceiling (gen/relief.js
+    // addCeiling), set by script.js. The eye rides over a mountain, never through it.
+    this.ground = null;
 
     this.enabled = true;
     // in a settlement we orbit AROUND the buildings: a plain drag rotates (instead of
@@ -194,6 +201,8 @@ export class CameraRig {
   }
 
   update(t, dt) {
+    const lift = this.orbitOnly || this.tween ? 0 : 9 * THREE.MathUtils.smoothstep(this._pol, 1.26, 1.466);
+    this._lift += (lift - this._lift) * (1 - Math.pow(0.002, dt));
     // cinematic tween takes over when active
     if (this.tween) {
       const tw = this.tween;
@@ -217,6 +226,8 @@ export class CameraRig {
     if (this.idleDrift && now - this._lastInteract > 4) {
       this.azimuth += this.idleSpeed * dt;
     }
+    // on the map the point looked at rests ON the land: panning onto a mountain climbs it
+    if (this.ground && !this.orbitOnly) this.target.y = Math.max(16, this.ground(this.target.x, this.target.z) * 0.8);
     // critically-damped smoothing toward desired state
     const k = 1 - Math.pow(0.0001, dt); // ~time-constant smoothing
     this._azim += (this.azimuth - this._azim) * k;
@@ -230,12 +241,15 @@ export class CameraRig {
   apply() {
     const sinPol = Math.sin(this._pol);
     const x = this._tgt.x + this._rad * sinPol * Math.sin(this._azim);
-    const y = this._tgt.y + this._rad * Math.cos(this._pol);
+    let y = this._tgt.y + this._rad * Math.cos(this._pol);
     const z = this._tgt.z + this._rad * sinPol * Math.cos(this._azim);
+    // (on the map, and on the long flights between places — not inside a settlement,
+    // where the eye goes down to street level and into the portals)
+    if (this.ground && (this.tween ? this._rad > 160 : !this.orbitOnly)) y = Math.max(y, this.ground(x, z) + 10);
     this.camera.position.set(x, y, z);
     this.camera.lookAt(this._tgt);
-    if (this._fov !== this.camera.fov) {
-      this.camera.fov = this._fov;
+    if (this._fov + this._lift !== this.camera.fov) {
+      this.camera.fov = this._fov + this._lift;
       this.camera.updateProjectionMatrix();
     }
   }

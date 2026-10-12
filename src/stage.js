@@ -36,6 +36,9 @@ export function createStage(container) {
   renderer.toneMappingExposure = ACTIVE.exposure;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // the sun never moves and almost nothing that casts does: the shadow map is redrawn
+  // every other frame (see loop), not once per render pass
+  renderer.shadowMap.autoUpdate = false;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -105,21 +108,82 @@ export function createStage(container) {
   let renderHook = null; // optional override (e.g. postprocessing composer)
   function setRenderHook(fn) { renderHook = fn; }
 
+  // What a frame costs, summed over EVERY pass it makes (shadows, the portal's
+  // window, the picture itself): renderer.info is reset once per frame, not per pass.
+  renderer.info.autoReset = false;
+  const stats = { fps: 0, ms: 0, update: 0, calls: 0, triangles: 0, pixelRatio: renderer.getPixelRatio() };
+  let frames = 0, since = performance.now(), spentUpdating = 0, frameNo = 0;
+
+  // ADAPTIVE RESOLUTION. The one cost that scales with the screen is the number of
+  // pixels, and it is the first thing a modest GPU chokes on (a 2× display draws four
+  // times the pixels of a 1× one). When frames run long the picture is rendered at a
+  // lower pixel ratio; when there has been headroom for a while it goes back up.
+  const maxRatio = renderer.getPixelRatio(), minRatio = Math.min(maxRatio, 0.75);
+  let ratio = maxRatio, calm = 0, warmup = 6, holdUntil = 0;
+  const setRatio = (r) => { ratio = r; renderer.setPixelRatio(r); resize(); };
+  function adapt(now) {
+    if (warmup > 0) { warmup--; return; }            // shaders are still compiling
+    if (document.hidden || stats.ms > 250) return;   // the tab was away: not a slow frame
+    if (stats.ms > 27 && ratio > minRatio) {
+      setRatio(Math.max(minRatio, ratio - 0.25)); calm = 0; holdUntil = now + 20000;
+    } else if (stats.ms < 17.5 && ratio < maxRatio && now > holdUntil) {
+      if (++calm >= 6) { setRatio(Math.min(maxRatio, ratio + 0.25)); calm = 0; }
+    } else calm = 0;
+  }
+
   function loop() {
     if (!running) return;
     requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
+    const t0 = performance.now();
     updaters.forEach((cb) => cb(t, dt));
+    spentUpdating += performance.now() - t0;
+    if ((frameNo++ & 1) === 0) renderer.shadowMap.needsUpdate = true;
     if (renderHook) renderHook(t, dt);
     else if (camera) renderer.render(scene, camera);
+
+    stats.calls = renderer.info.render.calls; stats.triangles = renderer.info.render.triangles;
+    renderer.info.reset();
+    frames++;
+    const now = performance.now();
+    if (now - since >= 500) {
+      stats.ms = (now - since) / frames; stats.fps = 1000 / stats.ms; stats.update = spentUpdating / frames;
+      frames = 0; since = now; spentUpdating = 0;
+      adapt(now);
+      stats.pixelRatio = renderer.getPixelRatio();
+    }
   }
+  // WARM-UP. A mesh costs nothing until the first frame it is drawn in — and then, all
+  // at once, its buffers are uploaded, its textures sent, its shader compiled. Left
+  // alone that bill falls due in the middle of the first dive into each city, as a
+  // stutter. So the whole world is drawn once up front, from straight above, where
+  // nobody sees it: into a single pixel of the screen (the programs the picture uses)
+  // and into a tiny target (the ones the portal window uses).
+  function warm(reach = 2400) {
+    const eye = new THREE.OrthographicCamera(-reach, reach, reach, -reach, 1, 6000);
+    eye.position.set(0, 3000, 0); eye.lookAt(0, 0, 0);
+    eye.layers.enableAll();
+    eye.updateMatrixWorld();
+    const target = new THREE.WebGLRenderTarget(4, 4);
+    const tone = renderer.toneMapping;
+    renderer.shadowMap.needsUpdate = true;
+    renderer.setScissor(0, 0, 1, 1); renderer.setScissorTest(true);
+    renderer.render(scene, eye);
+    renderer.setScissorTest(false);
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.setRenderTarget(target); renderer.render(scene, eye); renderer.setRenderTarget(null);
+    renderer.toneMapping = tone;
+    target.dispose();
+    renderer.info.reset();
+  }
+
   function start() { if (!running) { running = true; clock.start(); loop(); } }
   function stop() { running = false; }
 
   return {
-    renderer, scene, sun, hemi, clock, applyTheme,
-    setCamera, onFrame, resize, start, stop, setRenderHook,
+    renderer, scene, sun, hemi, clock, applyTheme, stats,
+    setCamera, onFrame, resize, start, stop, setRenderHook, warm,
     get camera() { return camera; },
   };
 }

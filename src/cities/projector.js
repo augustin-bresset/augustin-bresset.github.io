@@ -9,6 +9,7 @@
 // beams sweeping the sky in slow, uneven crossing arcs.
 import * as THREE from 'three';
 import { box, cyl, glow, pointCloud, makeLabel, makeWallPortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
+import { Fabric, GROUND } from './urban.js';
 
 const GOLD = 0xd4af37, GOLD_HI = 0xf6dd8c;
 const ONYX = 0x211c28, ONYX_LO = 0x171420;
@@ -417,6 +418,66 @@ export function build() {
   addBeacon('screens', '#6fe0ff', 0, 9, 30);
   addBeacon('booth', '#3ee08a', -27, 6.5, 15);
 
+  // ===== THE BACKLOT — a studio at work inside its wall: blind sound stages, the
+  // writers' bungalows, the water tower every lot has, a crowd pressed along the
+  // carpet with its flashbulbs, limousines circling to the gate, a set being shot.
+  const fab = new Fabric({
+    seed: 1927, walls: [CREAM, 0xd9cdb0, 0xcfc2a2], roof: 'gable', roofs: [0x3a3440, 0x4a4352], trim: GOLD, pavement: 0x2f2a35,
+    windowLit: [0xf3d38a, 0xffe6b0], windowOff: 0x14121a, litP: 0.5, floorH: 2.0, bay: 1.8,
+    cars: [0x111014, 0xf2ead8, 0xc81e3a, GOLD], people: [0x111014, 0xf2ead8, 0xc81e3a, GOLD, CYAN, VIOLET],
+    leaves: [0x4f8a4a, 0x3f7a44], trunk: 0x6b5a42, lamp: GOLD_HI, pole: 0x2b2a32,
+  });
+  for (const [x, z, w, d, h] of [[-31, -7, 13, 9, 6.5], [31, -7, 13, 9, 6.5], [32, 13, 10, 8, 5.5]]) {     // the sound stages
+    fab.building(x, z, w, d, h, { windows: false, shop: false, y: 0, rise: 2.2 });
+    fab.prop(x, h - 1.0, z, w + 0.12, 0.4, d + 0.12, GOLD);
+    fab.prop(x, 0, z + d / 2 + 0.06, 3.4, 3.6, 0.1, ONYX_LO);                                           // the elephant door
+  }
+  for (const [x, z] of [[-27, 29], [-33, 23.5], [26, 29], [31.5, 23], [-36, 7], [28.5, -22]]) {         // the bungalows
+    fab.building(x, z, 4.4, 4.0, 3.2, { rot: Math.atan2(-x, -z), shop: false, y: 0 });
+  }
+  const DRIVE = 44;
+  fab.ring(DRIVE, 3.0, 0x1b1820);
+  fab.traffic({ ring: DRIVE }, { n: 7, speed: 3.4, l: 2.7, w: 1.0, h: 0.72 });
+  const palm = (x, z) => {
+    fab.prop(x, 0, z, 0.22, 5.6, 0.22, 0x6b5a42);
+    fab.crowns.push({ x, y: 6.1, z, s: 1.25, color: 0x4f8a4a }, { x: x + 0.5, y: 5.7, z: z + 0.3, s: 0.8, color: 0x3f7a44 });
+  };
+  for (const z of [9, 15, 21, 27]) { palm(-9.6, z); palm(9.6, z); }
+  for (let k = 0; k < 16; k++) {
+    const a = (k + 0.5) / 16 * Math.PI * 2;
+    if (Math.abs(a - 6.06) > 0.3) palm(Math.sin(a) * 47.2, Math.cos(a) * 47.2);                         // not across the gate
+  }
+  // the premiere: a crowd held back along the carpet, flashbulbs going off
+  fab.crowd(46, (i, rand) => [(i % 2 ? 1 : -1) * (4.4 + rand() * 3.6), 10 + rand() * 18], { roam: 0.35 });
+  for (let k = 0; k < 16; k++) {
+    fab.light((k % 2 ? 1 : -1) * (4.6 + (k * 0.37) % 3), GROUND + 1.5, 10.5 + (k * 1.13) % 17, 0xffffff, 0.36, 2.1 + (k % 5) * 0.7, k * 0.19, 0.05);
+  }
+  fab.walkers({ ring: DRIVE - 2.6 }, { n: 12, spread: 0.6 });
+  for (let k = 0; k < 10; k++) { const a = (k + 0.5) / 10 * Math.PI * 2; fab.lamp(Math.sin(a) * (DRIVE - 2.3), Math.cos(a) * (DRIVE - 2.3), 3.8); }
+  const fabric = fab.build();
+  g.add(fabric.group);
+
+  // the water tower
+  const tower = new THREE.Group(); tower.position.set(-28.5, 0, -22.5); g.add(tower);
+  for (const [dx, dz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) tower.add(box(0.28, 11, 0.28, ONYX_LO, { pos: [dx, 5.5, dz], roughness: 0.7 }));
+  for (const y of [3.6, 7.2]) for (const s of [-1.5, 1.5]) {
+    tower.add(box(3.1, 0.16, 0.16, ONYX_LO, { pos: [0, y, s], cast: false }), box(0.16, 0.16, 3.1, ONYX_LO, { pos: [s, y, 0], cast: false }));
+  }
+  tower.add(cyl(2.5, 2.5, 3.6, CREAM, 14, { pos: [0, 12.6, 0], roughness: 0.7 }), cyl(2.56, 2.56, 0.5, GOLD, 14, { pos: [0, 12.6, 0], emissive: GOLD, emissiveIntensity: 0.4 }));
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 14), new THREE.MeshStandardMaterial({ color: ONYX, flatShading: true, roughness: 0.6 }));
+  cap.position.y = 15.2; cap.castShadow = true; tower.add(cap);
+
+  // a set being shot: a painted sky flat, two lamps, the camera riding its crane
+  const set = new THREE.Group(); set.position.set(-25, 0, 5); set.rotation.y = 0.9; g.add(set);
+  set.add(box(7, 4.4, 0.2, 0x8fc4e8, { pos: [0, 2.6, -2.4], roughness: 0.9 }), box(7.2, 0.3, 0.6, 0x4a3a26, { pos: [0, 0.35, -2.4] }));
+  for (const dx of [-3.2, 3.2]) {
+    set.add(cyl(0.07, 0.07, 3.4, ONYX_LO, 5, { pos: [dx, 1.9, 1.4] }));
+    const lamp = glow(1.3, 1.0, 0xfff1cf, 1.6); lamp.position.set(dx, 3.6, 1.36); lamp.rotation.y = Math.PI; set.add(lamp);
+  }
+  set.add(box(1.5, 0.5, 1.0, ONYX_LO, { pos: [0, 0.65, 2.6] }), cyl(0.1, 0.1, 1.6, GOLD, 6, { pos: [0, 1.6, 2.6] }));
+  const boom = new THREE.Group(); boom.position.set(0, 2.4, 2.6); set.add(boom);
+  boom.add(box(0.16, 0.16, 5.2, GOLD, { pos: [0, 0, -1.8], roughness: 0.5 }), box(0.5, 0.45, 0.7, ONYX, { pos: [0, 0, -4.5] }), box(0.6, 0.6, 0.6, ONYX_LO, { pos: [0, 0, 0.9] }));
+
   tagPickable(g, 'projector');
 
   return {
@@ -462,6 +523,10 @@ export function build() {
         k.az.rotation.y = t * k.tw.sp + k.tw.ph;
         k.tilt.rotation.x = k.tw.base + Math.sin(t * k.tw.ts + k.tw.ph * 1.3) * 0.22;
       }
+
+      // the backlot: its fabric, and the camera crane feeling for its shot
+      fabric.update(t);
+      boom.rotation.y = Math.sin(t * 0.3) * 0.7; boom.rotation.x = 0.25 + Math.sin(t * 0.47) * 0.18;
 
       // the studio gate's globe, slowly turning (only present in the Universal-style gate)
       if (gateRig.spin) gateRig.spin.rotation.y = t * 0.3;

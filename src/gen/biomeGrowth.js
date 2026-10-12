@@ -5,8 +5,9 @@
 // neighbours of different biomes intersect their preferences — normalised). This
 // yields coherent regions and forbids absurd pairs (snow next to desert).
 //
-// Special seeding: a patch of OCEAN in one random corner (NOT a full island) and
-// one random VOLCANIC hotspot.
+// Special seeding: the OCEAN (a ring round an island, or one bay of a continent).
+// VOLCANIC is never seeded nor grown: it is the ash of a volcano's upper slopes,
+// laid by altitude where the world's relief is one (gen/relief.js).
 import { mulberry32, Simplex } from './noise.js';
 import { BIOME, BIOMES, adjWeight } from './biomes.js';
 
@@ -20,17 +21,25 @@ import { BIOME, BIOMES, adjWeight } from './biomes.js';
 // a trend flavours the map without letting one biome devour it.
 const TRENDS = [
   { key: 'balanced',  pick: 2, w: {} },
-  { key: 'alpine',    pick: 1, w: { mountain: 2.4, snow: 2.2, hills: 1.6, taiga: 1.7, plains: 0.55, desert: 0.5, savanna: 0.6, marsh: 0.5 },
+  { key: 'alpine',    pick: 1, w: { mountain: 2.4, snow: 2.2, hills: 1.6, taiga: 1.7, plains: 0.55, desert: 0.5, savanna: 0.6, marsh: 0.5, jungle: 0 },
     h: { mountain: 1.16, snow: 1.12 } },
   { key: 'prairie',   pick: 1, w: { plains: 2.6, savanna: 1.7, beach: 1.2, moor: 1.2, mountain: 0.4, snow: 0.3, hills: 0.6, mesa: 0.5 },
     h: { mountain: 0.88 } },
   { key: 'verdant',   pick: 1, w: { forest: 2.3, taiga: 1.6, marsh: 1.7, plains: 1.3, desert: 0.3, savanna: 0.5, mesa: 0.4 } },
   { key: 'arid',      pick: 1, w: { desert: 2.4, savanna: 2.0, mesa: 2.2, plains: 0.7, forest: 0.4, marsh: 0.3, taiga: 0.5, snow: 0.5 } },
-  { key: 'highlands', pick: 1, w: { moor: 2.8, plateau: 2.2, hills: 1.9, taiga: 1.3, forest: 0.7, desert: 0.3, savanna: 0.4, mesa: 0.4 },
+  { key: 'highlands', pick: 1, w: { moor: 2.8, plateau: 2.2, hills: 1.9, taiga: 1.3, forest: 0.7, desert: 0.3, savanna: 0.4, mesa: 0.4, jungle: 0 },
     h: { moor: 1.08, plateau: 1.05 } },
+  // the far north: conifers to the shore, snow low on every slope
+  { key: 'boreal',    pick: 1, w: { taiga: 2.8, snow: 1.9, moor: 1.6, mountain: 1.5, hills: 1.2, plains: 0.7, forest: 0.6, desert: 0.1, savanna: 0.2, mesa: 0.15, jungle: 0 } },
+  // the tropics: jungle down to palm beaches, lagoons, a snow line out of reach
+  { key: 'tropical',  pick: 1, w: { jungle: 9, beach: 1.9, marsh: 1.5, savanna: 1.0, forest: 0.8, plains: 0.7, snow: 0.05, taiga: 0.05, moor: 0.2, mountain: 0.6, desert: 0.6 } },
+  // a temperate country in October: its woods have turned (see gen/placement.js)
+  { key: 'autumn',    pick: 1, w: { forest: 2.5, hills: 1.5, moor: 1.4, plains: 1.2, taiga: 0.8, desert: 0.25, savanna: 0.4, mesa: 0.35, jungle: 0 } },
 ];
+export const TREND_KEYS = TRENDS.map((t) => t.key);
 
-export function growBiomes(graph, seed, { mode = 'island' } = {}) {
+// trend: force this world's character (a TRENDS key) instead of rolling it from the seed
+export function growBiomes(graph, seed, { mode = 'island', trend: forced = null } = {}) {
   const { sites, neighbors, cols, rows } = graph;
   const rand = mulberry32((seed ^ 0xb107e9a1) >>> 0);
 
@@ -38,6 +47,7 @@ export function growBiomes(graph, seed, { mode = 'island' } = {}) {
   let tTot = 0; for (const t of TRENDS) tTot += t.pick;
   let tr = rand() * tTot, trend = TRENDS[0];
   for (const t of TRENDS) { tr -= t.pick; if (tr <= 0) { trend = t; break; } }
+  trend = TRENDS.find((t) => t.key === forced) || trend;
   graph.trend = trend.key;
   graph.trendHeight = trend.h || {};
   const trendW = (id) => trend.w[BIOMES[id].key] ?? 1;
@@ -127,34 +137,15 @@ export function growBiomes(graph, seed, { mode = 'island' } = {}) {
     };
   }
 
-  // --- 2. VOLCANIC hotspot: one inland site near the CENTRE (so the lone volcano,
-  // when it spawns, sits in the reachable heart of the map) grown to a SMALL blob so
-  // the dark scorched "cailloux" biome stays a single contained patch around the cone
-  // instead of sprawling burnt splotches across the whole continent. ---
-  const ccx = (cols - 1) / 2, ccy = (rows - 1) / 2;
-  const inland = sites.filter((s) => s.biome === -1 &&
-    s.c > 2 && s.r > 2 && s.c < cols - 3 && s.r < rows - 3);
-  const nearCentre = inland.filter((s) => {
-    const d = Math.hypot(s.c - ccx, s.r - ccy);
-    return d >= 3.5 && d <= 9;   // central, but off dead-centre (room for cities)
-  });
-  const pool = nearCentre.length ? nearCentre : inland;
-  if (pool.length) {
-    const hs = pool[(rand() * pool.length) | 0];
-    for (const s of sites) {
-      if (s.biome === -1 && Math.hypot(s.c - hs.c, s.r - hs.r) < 1.7) assign(s, BIOME.VOLCANIC);
-    }
-  }
-
-  // --- 3. a few random land seeds to start regions ---
+  // --- 2. a few random land seeds to start regions ---
   const seedCount = Math.max(4, Math.round(sites.length * 0.02));
   for (let i = 0; i < seedCount; i++) {
     const s = sites[(rand() * sites.length) | 0];
     if (s.biome === -1) assign(s, randomLand());
   }
 
-  // --- 4. grow: repeatedly assign frontier cells from neighbour adjacency ---
-  // VOLCANIC is always excluded so it never sprawls past its seeded blob. In ISLAND
+  // --- 3. grow: repeatedly assign frontier cells from neighbour adjacency ---
+  // VOLCANIC is always excluded (see above). In ISLAND
   // mode OCEAN is excluded too, so the shoreline stays exactly the seeded Voronoi
   // land/sea boundary (land grows up to it as beach/plains); in land mode the bay
   // may still spread.

@@ -2,7 +2,7 @@
 
 A portfolio rendered as a **procedural 3D island** — a low-poly, hand-illustrated
 diorama you look at from an oblique 3/4 angle. Each page load generates a brand-new
-landscape (terrain, rivers, ravines, forests, sometimes a volcano), while the four
+landscape (a climate, a shape of mountains, rivers, lakes, waterfalls, forests), while the
 **project settlements** stay anchored in place. Click a settlement to dive in and
 read about the project. FR/EN toggle.
 
@@ -11,11 +11,14 @@ No build step — plain ES modules + [Three.js] (vendored). Works on GitHub Page
 ## Run locally
 
 ```bash
-python3 -m http.server 8137
+python3 serve.py
 # open http://127.0.0.1:8137/
 ```
 
-URL params: `?seed=123` (reproducible world) · `?lang=fr|en` · `?focus=toaster`
+`serve.py` is `python3 -m http.server` plus a no-cache header: with the plain server the
+browser keeps old ES modules for hours, and a reload doesn't show your edits.
+
+URL params: `?seed=123` (reproducible world) · `?trend=alpine|tropical|arid|autumn|boreal|…` (its climate) · `?relief=domes|crests|needles|tables|towers|volcano` (the shape of its mountains) · `?lang=fr|en` · `?focus=toaster` · `?stats` (frame cost readout)
 (deep-link straight into a project) · `?outline=1` (experimental ink outline).
 
 ## Architecture
@@ -35,10 +38,17 @@ src/
   gen/
     noise.js         seeded PRNG + simplex + fBm + domain warp
     heightmap.js     continental mask + warped fBm + ridged mountains → height field
+    relief.js        the great relief: a massif + a lesser range, in one of six shapes
+                     (domes · crests · needles · tables · towers · volcano), altitude zonation
+    erosion.js       stream-power erosion + scree (how much depends on the relief)
     hydrology.js     flow-accumulation rivers + a carved ravine (real terrain technique)
+    features.js      what the finished land holds: its peak, lakes, waterfalls, lava
+    farmland.js      the fields round the farming towns
     biomes.js        sea/beach/grass/forest/rock/snow/cliff classification + colours
     placement.js     jittered-grid scatter of trees / rocks / reeds by biome
-  bricks/            terrain.js, water.js, rivers.js, trees.js, rocks.js, volcano.js
+  bricks/            terrain.js, water.js, rivers.js, lakes.js, falls.js, volcano.js (lava,
+                     plume), trees.js, rocks.js, clouds.js, weather.js, life.js (herds,
+                     birds, balloons, whales, sails, and each climate's monuments)
   cities/
     registry.js      the list of projects (anchors + builders)  ← extend here
     kit.js           shared building blocks (boxes, glow, labels…)
@@ -60,4 +70,12 @@ Each settlement uses the **real visual identity** of its project: Apairo's amber
 The plateau, scatter exclusion, label, picking and dive navigation are all wired
 automatically from the registry.
 
+## Analytics
+
+Traffic is tracked with [GoatCounter] — cookie-free, so no consent banner.
+Besides pageviews, diving into a settlement fires a custom `city/<id>` event
+(see `src/navigation.js`), so per-project interest shows up in the dashboard:
+<https://smaug.goatcounter.com>.
+
 [Three.js]: https://threejs.org
+[GoatCounter]: https://www.goatcounter.com

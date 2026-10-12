@@ -27,6 +27,19 @@ export const EXIT_H1     = 900;    // sky height of the Klein-bottle exit portal
 
 let _renderer = null, _scene = null, _rt = null, _camera = null;
 const _discs = [];                        // portal disc meshes to hide during RT render
+// The window costs a whole second render of the world (and of its shadows). It is only
+// LIVE while the visitor is in a city or diving through its portal — and even then
+// only on frames where that city's pane is actually in view. The rest of the time
+// (the whole overview) every pane just shows a soft idle glow: see uLive in kit.js.
+let _active = [];                         // the panes of the city being visited
+const _live = { value: 0 };               // shared uniform: 1 = panes show the render target
+const _frustum = new THREE.Frustum(), _vp = new THREE.Matrix4();
+// …and only the part of the screen the pane covers is drawn: the virtual camera's
+// projection is CROPPED to that rectangle (so everything outside it is culled before
+// it costs a draw call) and rendered into the matching rectangle of the target.
+const _rect = { x: 0, y: 0, w: 1, h: 1 }; // the panes' bounding rectangle, in target pixels
+const _crop = new THREE.Matrix4(), _corner = new THREE.Vector4(), _box = new THREE.Box3();
+const _eye = new THREE.Vector3();
 const _res   = new THREE.Vector2(1, 1);   // drawing-buffer size (shared with disc shader)
 const _lift  = new THREE.Matrix4();        // world-space +ΔY translation (horizontal discs)
 // WALL portals (vertical, on a façade) need the FULL portal transform M = T_B·inv(T_A):
@@ -54,6 +67,9 @@ export const portalRender = {
   },
 
   get texture()    { return _rt ? _rt.texture : null; },
+  get live()       { return _live; },                   // share as the panes' uLive uniform
+  // the panes someone may look through right now ([] = none: the window sleeps)
+  setActive(panes) { _active = panes || []; _live.value = _active.length ? 1 : 0; },
   get resolution() { return _res; },                    // live Vector2 (share as uniform)
   get liftY()      { return EXIT_H1 - DISC_FACE_Y; },   // ΔY the emerge camera rises by
 
@@ -93,12 +109,51 @@ export const portalRender = {
     if (!_camera || !playerCamera) return;
     _camera.matrixWorld.multiplyMatrices(_hasWall ? _wallM : _lift, playerCamera.matrixWorld);
     _camera.matrixWorldInverse.copy(_camera.matrixWorld).invert();
-    _camera.projectionMatrix.copy(playerCamera.projectionMatrix);
-    _camera.projectionMatrixInverse.copy(playerCamera.projectionMatrixInverse);
+    // the detail worth drawing from up THERE (world.js detailMask), not from where the player stands
+    _camera.layers.mask = this.detailMask
+      ? this.detailMask(_eye.setFromMatrixPosition(_camera.matrixWorld)) : playerCamera.layers.mask;
+
+    // which part of the screen do the live panes cover this frame?
+    _vp.multiplyMatrices(playerCamera.projectionMatrix, playerCamera.matrixWorldInverse);
+    _frustum.setFromProjectionMatrix(_vp);
+    let x0 = 1, y0 = 1, x1 = -1, y1 = -1;
+    this.inView = false;
+    for (const pane of _active) {
+      if (!_frustum.intersectsObject(pane)) continue;
+      this.inView = true;
+      if (!pane.geometry.boundingBox) pane.geometry.computeBoundingBox();
+      _box.copy(pane.geometry.boundingBox);
+      for (let k = 0; k < 8; k++) {
+        _corner.set(k & 1 ? _box.max.x : _box.min.x, k & 2 ? _box.max.y : _box.min.y, k & 4 ? _box.max.z : _box.min.z, 1)
+          .applyMatrix4(pane.matrixWorld).applyMatrix4(_vp);
+        if (_corner.w < 1e-3) { x0 = y0 = -1; x1 = y1 = 1; break; }   // a corner behind the eye: the whole screen
+        x0 = Math.min(x0, _corner.x / _corner.w); x1 = Math.max(x1, _corner.x / _corner.w);
+        y0 = Math.min(y0, _corner.y / _corner.w); y1 = Math.max(y1, _corner.y / _corner.w);
+      }
+    }
+    if (!this.inView) return;
+    // snapped OUT to whole pixels (plus one of margin), so the window still samples 1:1
+    _renderer.getDrawingBufferSize(_res);
+    const W = _res.x, H = _res.y;
+    const px0 = Math.max(0, Math.floor((x0 * 0.5 + 0.5) * W) - 1), px1 = Math.min(W, Math.ceil((x1 * 0.5 + 0.5) * W) + 1);
+    const py0 = Math.max(0, Math.floor((y0 * 0.5 + 0.5) * H) - 1), py1 = Math.min(H, Math.ceil((y1 * 0.5 + 0.5) * H) + 1);
+    if (px1 <= px0 || py1 <= py0) { this.inView = false; return; }
+    _rect.x = px0; _rect.y = py0; _rect.w = px1 - px0; _rect.h = py1 - py0;
+    const nx0 = px0 / W * 2 - 1, nx1 = px1 / W * 2 - 1, ny0 = py0 / H * 2 - 1, ny1 = py1 / H * 2 - 1;
+    // clip space → the rectangle stretched over the whole of it
+    _crop.set(
+      2 / (nx1 - nx0), 0, 0, -(nx0 + nx1) / (nx1 - nx0),
+      0, 2 / (ny1 - ny0), 0, -(ny0 + ny1) / (ny1 - ny0),
+      0, 0, 1, 0,
+      0, 0, 0, 1);
+    _camera.projectionMatrix.multiplyMatrices(_crop, playerCamera.projectionMatrix);
+    _camera.projectionMatrixInverse.copy(_camera.projectionMatrix).invert();
   },
+  inView: false,
+  detailMask: null,          // (eye: Vector3) → camera layer mask; set by script.js
 
   render() {
-    if (!_rt || !_renderer || !_scene || !_camera) return;
+    if (!_rt || !_renderer || !_scene || !_camera || !this.inView) return;
 
     // Keep the RT sized to the screen so screen-space sampling stays 1:1.
     _renderer.getDrawingBufferSize(_res);
@@ -106,6 +161,10 @@ export const portalRender = {
 
     const savedTone = _renderer.toneMapping;
     _renderer.toneMapping = THREE.NoToneMapping;   // RT = linear radiance (shader maps it)
+
+    _rt.viewport.set(_rect.x, _rect.y, _rect.w, _rect.h);
+    _rt.scissor.set(_rect.x, _rect.y, _rect.w, _rect.h);
+    _rt.scissorTest = true;
 
     for (const d of _discs) d.visible = false;     // avoid RT feedback
     _renderer.setRenderTarget(_rt);

@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { box, cyl, makeLabel, makeWallPortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
 import { smoothstep } from '../gen/noise.js';
+import { Fabric } from './urban.js';
 
 const PAPER = 0xeceff3, CARD = 0xf6f7fa, LAVIS = 0xcfd8ec, INK = 0x2a36a8, PENCIL = 0xe2462c;
 const GUIDE = 0xe5197d, GUIDE_DEEP = 0xb80f62;
@@ -28,7 +29,7 @@ const AZ = 0.42;
 // Same footing as the other built-up cities: the site stands LIFT above the (sunk)
 // city origin and whatever meets the ground runs SKIRT below it.
 const LIFT = 0.5, SKIRT = 2, FLOOR = 0.5;
-const SHEET_W = 68, SHEET_D = 52;
+const SHEET_W = 88, SHEET_D = 64;
 const SLOTS = [-19.5, -6.5, 6.5, 19.5], ROW_Z = 9;   // where the four projects stand
 
 // ---- the content, as Foliome holds it ------------------------------------------
@@ -112,6 +113,7 @@ function beams(segments, th, color) {
   }
   mesh.castShadow = false; mesh.receiveShadow = false;
   mesh.userData.noInk = true;
+  mesh.userData.detail = 0.6;            // strokes are hair-thin: dropped from afar (world.js sortDetail)
   mesh.raycast = () => {};               // strokes are never the thing you click
   return mesh;
 }
@@ -367,7 +369,7 @@ export function build() {
   // ===== THE SHEET — the site plan everything stands on ========================
   const fixed = new THREE.Group(); board.add(fixed);
   fixed.add(card(SHEET_W, FLOOR + SKIRT, SHEET_D, [0, (FLOOR - SKIRT) / 2, 0], PAPER));
-  const sheetPaper = paper(1024, 784);
+  const sheetPaper = paper(1024, 745);
   lettered.push(() => sheetPaper.draw(drawSheet));
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(SHEET_W, SHEET_D),
     new THREE.MeshStandardMaterial({ map: sheetPaper.tex, roughness: 1, emissive: 0xffffff, emissiveMap: sheetPaper.tex, emissiveIntensity: 0.34 }));
@@ -503,10 +505,39 @@ export function build() {
   pointer.raycast = () => {};
   board.add(pointer);
 
-  // ===== maquette trees along the sheet's edges =================================
-  for (const [x, z, r] of [[-31, -22, 1.5], [-24.5, -23.5, 1.1], [-15, -23, 1.3], [9, -23, 1.2], [31, -22.5, 1.5],
-    [31.5, -3, 1.2], [31, 3.5, 1.4], [-31.5, 20, 1.4], [-31, 3, 1.1], [-17, 22, 1.0]]) fixed.add(modelTree(x, z, r));
+  // ===== THE QUARTER — what stands around the four projects: as in any model, the
+  // neighbouring buildings are plain massing blocks, there to give the scale. Two
+  // streets of them each side, a row behind; scale figures and model cars between.
+  const quarter = new THREE.Group(); board.add(quarter);
+  const massing = (x, z, w, d, h, pitched) => {
+    quarter.add(card(w, h, d, [x, FLOOR + h / 2, z]));
+    if (pitched) {
+      const roof = gable(w, Math.min(w, d) * 0.42, d, 0.15); roof.position.set(x, FLOOR + h, z); quarter.add(roof);
+    }
+  };
+  for (const side of [-1, 1]) for (let i = 0; i < 2; i++) for (let j = 0; j < 8; j++) {
+    const x = side * (33.6 + i * 6.6), z = -26.5 + j * 7.4, n = (i * 3 + j * 5 + (side > 0 ? 2 : 0)) % 7;
+    if (side > 0 && z > 19) continue;                         // the title block sits there
+    if (n === 6) { quarter.add(modelTree(x - 1, z, 1.2), modelTree(x + 1.4, z + 1.3, 0.9)); continue; }   // a garden
+    massing(x, z, 4.6 + (n % 3) * 0.5, 5.0 + (n % 2) * 0.8, (z < -8 ? 5.5 : 3.2) + (n % 4) * 1.1, n % 2 === 0);
+  }
+  for (let k = 0; k < 9; k++) {
+    const x = -27.5 + k * 6.8, n = (k * 4 + 1) % 7;
+    massing(x, -28, 5.0 + (n % 2) * 0.6, 4.6, 6.2 + (n % 4) * 1.3, n % 3 === 0);
+  }
+  for (const [x, z, r] of [[-28.5, -22.5, 1.4], [-17, -23.5, 1.2], [9.5, -23.5, 1.2], [29, -22.5, 1.4], [29.5, -3, 1.2],
+    [29, 4, 1.3], [-29.5, 21, 1.4], [-29, 5, 1.1], [-17, 24.5, 1.0], [-6, 27, 1.2], [7, 27.5, 1.0]]) quarter.add(modelTree(x, z, r));
+  inkEdges(quarter, 0.07);
   inkEdges(fixed, 0.08);
+  // scale figures and model cars: card-white and ink-blue, with one in the editor's magenta
+  const folk = new Fabric({ seed: 88, people: [0xf6f7fa, 0xdfe6f5, 0x2a36a8, 0x5f6fd8, 0xf6f7fa, 0x2a36a8], cars: [0xf6f7fa, 0xdbe1ee, 0x2a36a8] });
+  folk.walkers({ pts: [[-26.5, 2.6], [26.5, 2.6], [26.5, 17.2], [-26.5, 17.2]], closed: true }, { n: 16, spread: 0.9 });
+  folk.walkers({ pts: [[-26.5, 2.6], [26.5, 2.6], [26.5, 17.2], [-26.5, 17.2]], closed: true }, { n: 1, spread: 0.2, colors: [GUIDE] });
+  folk.crowd(6, (i, rand) => [1.6 + (rand() - 0.5) * 5, -7.2 + rand() * 2.4], { roam: 0.5 });       // at the atelier's door
+  folk.crowd(5, (i, rand) => [-18 + (rand() - 0.5) * 4, -2.5 + rand() * 2.5], { roam: 0.5 });       // by the lab's table
+  for (const side of [-1, 1]) folk.traffic({ pts: [[side * 30.3, -25], [side * 30.3, side > 0 ? 18 : 25]] }, { n: 3, speed: 2.2, l: 1.6, w: 0.8, h: 0.6, lane: 0.55 });
+  const figures = folk.build();
+  board.add(figures.group);
 
   // ===== POI beacons ============================================================
   const pois = [];
@@ -633,7 +664,7 @@ export function build() {
 
   return {
     group: g, label,
-    frame: { target: [0, 6, 0], azimuth: AZ, polar: 53, radius: 88 },
+    frame: { target: [0, 6, 1], azimuth: AZ, polar: 53, radius: 108 },
     pois: poiRecords,
     update(t, dt = 0.016) {
       portal.update(t);
@@ -672,6 +703,7 @@ export function build() {
         m.material.opacity = smoothstep(0.34 + i * 0.1, 0.42 + i * 0.1, f) * (1 - smoothstep(0.92, 1, f));
       });
       glass.material.emissiveIntensity = 0.3 + Math.sin(t * 0.9) * 0.08;
+      figures.update(t);
     },
   };
 }

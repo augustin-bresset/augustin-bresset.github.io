@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { box, cyl, glow, wireBox, pointCloud, makeLabel, makeWallPortal, poiBeacon, tagPOI, tagPickable } from './kit.js';
 import { Simplex, clamp, smoothstep } from '../gen/noise.js';
+import { Fabric, GROUND } from './urban.js';
 
 const N = 32, PITCH = 1.5, RMAX = 24;
 const BLUE = 0x3b82f6, BLUE_HI = 0x5b9bff, CYAN = 0x2ad4ff;
@@ -204,6 +205,34 @@ export function build() {
   const label = makeLabel('Splasher', 'BEV Labeling', '#3b82f6');
   label.sprite.position.set(0, 40, 0); g.add(label.sprite);
 
+  // ===== THE CITY IN THE GRID — the tall cells are towers: lit floors on their
+  // faces, cars on the square avenues, and down the drivable corridor the ROVER
+  // whose way all this labelling is for.
+  const fab = new Fabric({
+    seed: 3303, windowLit: [0xd8f4ff, 0x9fe3ff, 0xfff3c4], windowOff: 0x16223f, litP: 0.3, floorH: 1.6, bay: 0.9,
+    cars: [0xbfe9ff, 0x3b82f6, 0xffffff, 0x8a5cff], people: [0xbfe9ff, 0xffffff, 0x5b9bff],
+  });
+  for (const c of cells) if (!c.corridor && c.h > 8.5) fab.windowsOn(c.x, 0, c.z, 1.25, 1.25, c.h, 0);
+  for (const rc of [10, 18]) {
+    fab.traffic({ pts: [[rc, rc], [-rc, rc], [-rc, -rc], [rc, -rc]], closed: true }, { n: rc > 12 ? 12 : 7, speed: 3.2, lane: 0.36, w: 0.5, h: 0.42, l: 1.0 });
+  }
+  fab.walkers({ pts: [[-22, 0], [-4, 0]] }, { n: 6, spread: 0.6 });
+  fab.walkers({ pts: [[0, -22], [0, -4]] }, { n: 6, spread: 0.6 });
+  fab.walkers({ pts: [[0, 4], [0, 22]] }, { n: 6, spread: 0.6 });
+  const fabric = fab.build();
+  g.add(fabric.group);
+  // the rover: six wheels, a mast, a spinning lidar
+  const rover = new THREE.Group(); rover.position.set(6, GROUND + 0.1, 0); g.add(rover);
+  rover.add(box(2.0, 0.5, 1.2, 0xe9eef4, { pos: [0, 0.55, 0], roughness: 0.5 }), box(0.9, 0.35, 0.9, 0x1d2733, { pos: [-0.3, 0.95, 0] }));
+  for (const dx of [-0.75, 0, 0.75]) for (const dz of [-0.68, 0.68]) {
+    const wheel = cyl(0.3, 0.3, 0.22, 0x10151c, 8, { roughness: 0.8 }); wheel.rotation.x = Math.PI / 2; wheel.position.set(dx, 0.3, dz); rover.add(wheel);
+  }
+  rover.add(cyl(0.05, 0.05, 1.0, 0x8a94a2, 5, { pos: [0.5, 1.3, 0] }));
+  const roverLidar = cyl(0.24, 0.24, 0.26, CYAN, 10, { pos: [0.5, 1.9, 0], emissive: CYAN, emissiveIntensity: 1.4 });
+  rover.add(roverLidar);
+  const roverBeam = glow(3.4, 0.16, CYAN, 1.6); roverBeam.rotation.x = -Math.PI / 2; roverBeam.position.set(1.7, 0, 0);
+  roverBeam.material.transparent = true; roverBeam.material.opacity = 0.5; roverLidar.add(roverBeam);
+
   tagPickable(g, 'splasher');
 
   const _base = new THREE.Color(), _tint = new THREE.Color(BLUE_HI);
@@ -214,6 +243,12 @@ export function build() {
     update(t) {
       portal.update(t);
       for (const p of pois) p.beacon.update(t);
+      // the city in the grid, and the rover patrolling its corridor end to end
+      fabric.update(t);
+      const lap = (t * 0.06) % 1, out = lap < 0.5;
+      rover.position.x = 5 + (out ? lap * 2 : 2 - lap * 2) * 16.5;
+      rover.rotation.y = out ? 0 : Math.PI;
+      roverLidar.rotation.y = t * 5;
 
       // splash rings expand from the ego dot; cells inside a ring's annulus flip
       // toward class-blue, then decay back to their stored viridis behind it

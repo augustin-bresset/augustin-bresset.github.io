@@ -20,7 +20,7 @@ export const CITIES = [
     affinity: { beach: 1.0, plains: 0.5, savanna: 0.45 },
   },
   {
-    // neon forge → barren scrubland, drawn to the lone volcano (see placement.js)
+    // neon forge → barren scrubland
     id: 'toaster', build: buildToaster, radius: 50,
     affinity: ['plains', 'savanna', 'desert'],
   },
@@ -44,19 +44,19 @@ export const CITIES = [
   {
     // Rubicon: a Bangkok jewelry manufacturer's office, reclaimed by a strangler
     // fig — the solo ERP-migration internship → humid tropical canopy
-    id: 'rubicon', build: buildRubicon, radius: 38,
+    id: 'rubicon', build: buildRubicon, radius: 50,
     affinity: { forest: 1.0, marsh: 0.4, plains: 0.25 },
   },
   {
-    // Hubs: an open-air odeon where the speakers sit on the steps and one microphone
-    // listens — theatres like this were cut into hillsides, in dry open country
-    id: 'hubs', build: buildHubs, radius: 46,
-    affinity: { hills: 1.0, plains: 0.6, moor: 0.6, savanna: 0.4 },
+    // Hubs: an old town on the night of its street party, one microphone on the
+    // square listening to four sound towers → gentle country, a town among fields
+    id: 'hubs', build: buildHubs, radius: 50,
+    affinity: { plains: 1.0, hills: 0.7, savanna: 0.5, moor: 0.4 },
   },
   {
     // Foliome: an architect's model on its site plan — the tool's demo practice builds
     // "in the mountains, always", so it likes high, cold ground
-    id: 'foliome', build: buildFoliome, radius: 46,
+    id: 'foliome', build: buildFoliome, radius: 58,
     affinity: { taiga: 1.0, moor: 0.7, hills: 0.6, plains: 0.4 },
   },
 ];

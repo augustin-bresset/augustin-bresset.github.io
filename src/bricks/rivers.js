@@ -1,7 +1,7 @@
-// rivers.js (brick) — builds animated water ribbons along river polylines, plus
-// a dark water thread at the bottom of the ravine. Ribbons follow the carved
-// terrain so the water sits in its valley.
+// rivers.js (brick) — the rivers' water: one ribbon per river, laid in the channel
+// hydrology.js cut for it, plus a dark water thread at the bottom of the ravine.
 import * as THREE from 'three';
+import { smoothPath } from '../gen/hydrology.js';
 
 // Chaikin-style smoothing so ribbons flow instead of stair-stepping.
 function smooth(points, iters = 2) {
@@ -92,14 +92,77 @@ function buildRibbon(rawPoints, field, opts) {
   return { mesh, uniforms };
 }
 
+// A RIVER: a ribbon laid at the water level its channel was cut for (hydrology.js),
+// along the same smoothed curve, as wide as the channel's bed. Paler along the banks
+// where it shallows, streaked by the current, fading in at the spring and out where
+// it meets the sea.
+function buildRiver(rawPoints, field) {
+  const pts = smoothPath(rawPoints, 2);
+  const n = pts.length;
+  if (n < 4) return null;
+  const pos = [], uvs = [], ends = [], drops = [], indices = [];
+  let run = 0;
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    if (i) run += Math.hypot(p.x - a.x, p.z - a.z);
+    let tx = b.x - a.x, tz = b.z - a.z;
+    const tl = Math.hypot(tx, tz) || 1;
+    tx /= tl; tz /= tl;
+    // the level it was cut at — but never above the ground as it is NOW (a city's
+    // shelf may have reshaped it since): there the river slips under, it never floats
+    const y = Math.min(p.y, field.heightAt(p.x, p.z) + 1.3);
+    const w = p.w * 0.94 * Math.min(1, 0.28 + i / 22);       // a stream at its source, widening as it goes
+    pos.push(p.x - tz * w, y, p.z + tx * w, p.x + tz * w, y, p.z - tx * w);
+    uvs.push(0, run / 11, 1, run / 11);
+    const end = Math.min(1, i / 6, (n - 1 - i) / 8);
+    ends.push(end, end);
+    // how steeply it falls here: past a gentle grade the water breaks white
+    const fall = Math.abs(b.y - a.y) / (Math.hypot(b.x - a.x, b.z - a.z) || 1);
+    const drop = Math.min(1, Math.max(0, (fall - 0.24) * 3.0));
+    drops.push(drop, drop);
+    if (i < n - 1) { const k = i * 2; indices.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('aEnd', new THREE.Float32BufferAttribute(ends, 1));
+  geo.setAttribute('aDrop', new THREE.Float32BufferAttribute(drops, 1));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x4a8fb5, roughness: 0.3, metalness: 0.0, transparent: true, opacity: 0.95,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  const uniforms = { uTime: { value: 0 } };
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = uniforms.uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nattribute float aEnd;\nattribute float aDrop;\nvarying vec2 vRiver;\nvarying float vEnd;\nvarying float vDrop;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vRiver = uv; vEnd = aEnd; vDrop = aDrop;\n transformed.y += sin(uv.y * 5.0 - uTime * 3.0) * 0.05;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec2 vRiver;\nvarying float vEnd;\nvarying float vDrop;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float edge = abs(vRiver.x - 0.5) * 2.0;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.64, 0.85, 0.86), smoothstep(0.45, 1.0, edge) * 0.6);
+        diffuseColor.rgb += 0.06 * sin(vRiver.y * 7.0 - uTime * 2.6 + sin(vRiver.x * 7.0) * 1.6);
+        // rapids and falls: streaks of foam racing down the steep reaches
+        float foam = vDrop * (0.5 + 0.5 * sin(vRiver.y * 31.0 - uTime * 13.0 + sin(vRiver.x * 11.0) * 2.4));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.96, 0.98, 0.98), clamp(foam * 1.1 + vDrop * 0.25, 0.0, 0.92));
+        diffuseColor.a *= vEnd * (1.0 - smoothstep(0.8, 1.0, edge) * 0.45);`);
+  };
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 2;
+  return { mesh, uniforms };
+}
+
 export function buildRivers(hydro, field) {
   const group = new THREE.Group();
   group.name = 'rivers';
   const flows = [];
 
-  // wide enough to read as flowing lines across the ~1000u continent
   for (const poly of hydro.rivers) {
-    const r = buildRibbon(poly, field, { color: 0x4f8db0, yOffset: 0.35, minW: 2.4, wScale: 1.9 });
+    const r = buildRiver(poly, field);
     if (r) { group.add(r.mesh); flows.push(r.uniforms); }
   }
 

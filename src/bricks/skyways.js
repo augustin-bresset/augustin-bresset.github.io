@@ -11,6 +11,7 @@ const CLEAR = 22;                 // tube clearance above the terrain profile
 
 export function buildSkyways(field, pads, seed, opts = {}) {
   const islands = opts.islands || null;   // floating mode: land test for pylons/heights
+  const obstacles = opts.obstacles || []; // [{ x, y, z, r, h }] what stands in the way: the tube goes over it
   const group = new THREE.Group();
   group.name = 'skyways';
   const rand = mulberry32((seed ^ 0x51c1e5) >>> 0);
@@ -52,6 +53,7 @@ export function buildSkyways(field, pads, seed, opts = {}) {
       if (land) {
         h = Math.max(h, field.heightAt(x + ux * 8, z + uz * 8), field.heightAt(x - ux * 8, z - uz * 8));
       }
+      for (const o of obstacles) if (Math.hypot(x - o.x, z - o.z) < o.r + 14) h = Math.max(h, o.y + o.h - CLEAR * 0.5);
       raw.push({ x, z, y: Math.max(6, h) + CLEAR });
     }
     // two smoothing passes → a calm, believable elevated line
@@ -82,6 +84,7 @@ export function buildSkyways(field, pads, seed, opts = {}) {
     for (let s = 2; s < NPTS - 1; s += 4) {
       const p = raw[s];
       if (islands && !islands.atWorld(p.x, p.z)) continue;   // no pylons over the void
+      if (obstacles.some((o) => Math.hypot(p.x - o.x, p.z - o.z) < o.r + 4)) continue;   // …nor through a monument
       const groundY = Math.max(-1, field.heightAt(p.x, p.z));
       const h = p.y - groundY;
       if (h < 6) continue;
@@ -142,7 +145,10 @@ export function buildSkyways(field, pads, seed, opts = {}) {
         c.heading += applied;
         c.x += Math.cos(c.heading) * c.speed * dt;
         c.z += Math.sin(c.heading) * c.speed * dt;
-        c.o.position.set(c.x, c.alt + Math.sin(t * 0.4 + c.ph) * 2.2, c.z);
+        // (cruising height — but over high ground it climbs, and comes back down beyond)
+        const clear = field.ceilingAt ? field.ceilingAt(c.x, c.z) + 26 : 0;
+        c.y = c.y == null ? Math.max(c.alt, clear) : c.y + (Math.max(c.alt, clear) - c.y) * Math.min(1, dt * 0.6);
+        c.o.position.set(c.x, c.y + Math.sin(t * 0.4 + c.ph) * 2.2, c.z);
         c.o.rotation.y = Math.PI / 2 - c.heading;             // nose along the course
         c.roll += (Math.max(-0.3, Math.min(0.3, dh * 0.5)) - c.roll) * Math.min(1, dt * 2);
         c.o.rotation.z = c.roll;                              // gentle bank into turns

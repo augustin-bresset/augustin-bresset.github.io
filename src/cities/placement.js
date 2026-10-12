@@ -26,7 +26,7 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
     return m;
   };
 
-  // candidate sites: on land, NOT on the volcano cone, and inside the central
+  // candidate sites: on land, and inside the central
   // REACHABLE disc (radius 480) so every city can be reached by panning — the
   // camera target is clamped to a 520-radius disc (see camera.js _clampTarget) while
   // the terrain's far edge sits well past the fog wall, out of reach.
@@ -34,16 +34,29 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
   // (gen/islands.js sizes islands from inter-city spacing), so a cramped disc makes
   // unlinked islands crowd, fuse, or squeeze each other out entirely.
   const REACH = 480;
-  const cand = graph.sites.filter((s) => {
-    if (s.biome === BIOME.OCEAN || s.biome === BIOME.VOLCANIC) return false;
+  // …and on ground a town can be BUILT on: not up a mountain, not across a cliff. The
+  // relief under the pad (highest − lowest ground) is what world.js would have to cut
+  // and fill to level it; past a few storeys of that, the place is not a site.
+  const relief = (s) => {
+    let lo = Infinity, hi = -Infinity;
+    for (const r of [0, 30, 60]) for (let a = 0; a < (r ? 8 : 1); a++) {
+      const h = field.heightAt(s.x + Math.cos(a * Math.PI / 4) * r, s.z + Math.sin(a * Math.PI / 4) * r);
+      if (h < lo) lo = h; if (h > hi) hi = h;
+    }
+    return hi - lo;
+  };
+  const reachable = graph.sites.filter((s) => {
+    if (s.biome === BIOME.OCEAN) return false;
     if (Math.hypot(s.x, s.z) > REACH) return false;
     return field.heightAt(s.x, s.z) > 4;
   });
+  let cand = [];
+  for (const steep of [26, 38, 60, Infinity]) {            // as gentle as the country allows
+    cand = reachable.filter((s) => relief(s) < steep && field.heightAt(s.x, s.z) < 62
+      && (!field.massifAt || field.massifAt(s.x, s.z) < 0.12 || steep === Infinity));
+    if (cand.length >= cities.length * 5) break;
+  }
   if (!cand.length) return cities.map((c, i) => ({ city: c, x: (i - 1.5) * 120, z: 0 }));
-
-  // the lone volcano (if any): Toaster's forge likes to settle next to it
-  const volc = graph.sites.find((s) => s.biome === BIOME.VOLCANIC);
-  const volcPos = volc ? { x: volc.x, z: volc.z } : null;
 
   // ocean sites → so coastal projects (Apairo) can be pulled to the shore
   const oceanSites = graph.sites.filter((s) => s.biome === BIOME.OCEAN);
@@ -89,12 +102,6 @@ export function placeCities(field, graph, seed, cities, hydro = null) {
       const dRiver = distToRiver(s.x, s.z);
       const clear = city.radius + 16;
       if (dRiver < clear) score -= 2.0 * (1 - dRiver / clear);
-      // Toaster's forge gravitates to the lone volcano (heat/fire kinship): reward a
-      // band ~80u from the cone so it settles beside it, never on it.
-      if (id === 'toaster' && volcPos) {
-        const dv = Math.hypot(s.x - volcPos.x, s.z - volcPos.z);
-        score += 1.3 * Math.exp(-Math.pow((dv - 80) / 60, 2));
-      }
       // Apairo wants the shoreline (apéro on the plage): a strong, long-range pull
       // toward the open sea so it actually settles on the coast.
       if (id === 'apairo') {

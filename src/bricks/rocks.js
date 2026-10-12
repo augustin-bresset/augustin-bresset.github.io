@@ -1,5 +1,7 @@
-// rocks.js (brick) — instanced low-poly boulders scattered on rocky ground.
+// rocks.js (brick) — instanced low-poly boulders scattered on rocky ground, and the
+// sea stacks standing off the rocky shores.
 import * as THREE from 'three';
+import { underWeather } from './weather.js';
 
 const _m  = new THREE.Matrix4();
 const _q  = new THREE.Quaternion();
@@ -14,17 +16,18 @@ export function buildRocks(scatter) {
   group.name = 'rocks';
   const list = scatter.rocks;
   if (!list.length) return { group, update() {}, count: 0 };
+  const stacks = scatter.stacks || [];
 
   // a chunky faceted boulder
   const geo = new THREE.DodecahedronGeometry(1, 0);
   geo.scale(1, 0.7, 1.05);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 });
+  const mat = underWeather(new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1 }));
 
   const mesh = new THREE.InstancedMesh(geo, mat, list.length);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
 
-  const base = new THREE.Color('#8a8170');
+  const base = new THREE.Color('#8a8170'), snowed = new THREE.Color('#dfe4e2');
   const _c = new THREE.Color();
   let n = 0;
   for (const r of list) {
@@ -44,13 +47,34 @@ export function buildRocks(scatter) {
     _s.setScalar(r.scale * 1.3);
     _m.compose(_p, _q, _s);
     mesh.setMatrixAt(n, _m);
-    _c.copy(base).offsetHSL(0, (r.tint - 0.5) * 0.05, (r.tint - 0.5) * 0.18);
+    _c.copy(r.snow ? snowed : base).offsetHSL(0, (r.tint - 0.5) * 0.05, (r.tint - 0.5) * (r.snow ? 0.06 : 0.18));
     mesh.setColorAt(n, _c);
     n++;
   }
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.raycast = () => {};
   group.add(mesh);
+
+  // SEA STACKS: tall pillars standing in the shallows, their feet in the water
+  if (stacks.length) {
+    const pillar = new THREE.DodecahedronGeometry(1, 0);
+    pillar.scale(1, 1, 0.92);
+    const sea = new THREE.InstancedMesh(pillar, mat, stacks.length);
+    const dark = new THREE.Color('#77705f');
+    stacks.forEach((r, i) => {
+      const h = r.scale * r.tall;
+      _p.set(r.x, r.y + h * 0.45, r.z);
+      _q.setFromAxisAngle(_up, r.rot);
+      _s.set(r.scale, h, r.scale);
+      _m.compose(_p, _q, _s);
+      sea.setMatrixAt(i, _m);
+      sea.setColorAt(i, _c.copy(dark).offsetHSL(0, 0, (r.tint - 0.5) * 0.12));
+    });
+    sea.castShadow = true; sea.receiveShadow = true;
+    sea.raycast = () => {};
+    group.add(sea);
+  }
 
   return { group, update() {}, count: n };
 }
