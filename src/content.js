@@ -51,7 +51,7 @@ const FIG_APAIRO_SYNC = `<svg viewBox="0 0 280 104" role="img" aria-label="Four 
 </svg>`;
 
 // Splasher — a bird's-eye grid, a drivable corridor labelled cell by cell.
-const FIG_SPLASHER_BEV = `<svg viewBox="0 0 200 128" role="img" aria-label="Bird's-eye grid with a drivable corridor labelled cell by cell">
+const FIG_SPLASHER_BEV = `<svg viewBox="0 0 200 128" role="img" aria-label="Bird's-eye grid with a drivable corridor labeled cell by cell">
   <g fill="#00d8ff" opacity="0.32">
     <rect x="80" y="88" width="20" height="20"/><rect x="80" y="68" width="20" height="20"/><rect x="100" y="68" width="20" height="20"/><rect x="100" y="48" width="20" height="20"/><rect x="120" y="48" width="20" height="20"/><rect x="120" y="28" width="20" height="20"/><rect x="140" y="28" width="20" height="20"/><rect x="140" y="8" width="20" height="20"/>
   </g>
@@ -236,10 +236,10 @@ export const POIS = {
     },
     rubicon: (l) => l === 'fr' ? {
       kicker: 'Montgolfière · Expérience', title: 'Rubicon',
-      body: "Stage solo à Bangkok : migration complète d'un ERP de bijouterie vers Odoo 18, 25 modules sur-mesure.",
+      body: "Stage solo à Bangkok : migration complète d'un ERP de bijouterie vers Odoo 18 — trois applications sur-mesure : produit & prix, ventes, production.",
     } : {
       kicker: 'Balloon · Experience', title: 'Rubicon',
-      body: 'A solo internship in Bangkok: a full jewelry-manufacturer ERP migration to Odoo 18, 25 custom modules.',
+      body: 'A solo internship in Bangkok: a full jewelry-manufacturer ERP migration to Odoo 18 — three custom applications: product & pricing, sales, production.',
     },
     hubs: (l) => l === 'fr' ? {
       kicker: 'Montgolfière · Projet', title: 'Hubs',
@@ -272,10 +272,10 @@ export const POIS = {
       meta: [['Courses', 'Reinforcement learning · Deep learning · Markov chains & Monte-Carlo · Convex & integer optimization · Hackathon (Hi!ckathon)']],
     },
     prepa: (l) => l === 'fr' ? {
-      kicker: 'Classe préparatoire · 2020–22', title: 'Lycée Saint-Louis',
+      kicker: 'Classe préparatoire · 2021–22', title: 'Lycée Saint-Louis',
       body: "Classe préparatoire aux concours des grandes écoles, MP option Informatique.",
     } : {
-      kicker: 'Prep school · 2020–22', title: 'Lycée Saint-Louis',
+      kicker: 'Prep school · 2021–22', title: 'Lycée Saint-Louis',
       body: "Classe préparatoire (competitive-exam track to France's top engineering schools), MP track with a Computer Science option.",
     },
     telecom: (l) => l === 'fr' ? {
@@ -302,32 +302,32 @@ export const POIS = {
     },
     ensta: (l) => l === 'fr' ? {
       kicker: 'Recherche · 2024–25', title: 'ENSTA Paris',
-      body: "Stage de recherche en SLAM LiDAR-IMU — mais l'essentiel du temps est parti dans la structure : concevoir l'architecture d'Apairo a pris plus de temps que la recherche. La graine de tout l'écosystème.",
+      body: "Stage de recherche : un benchmark de méthodes de SLAM LiDAR-IMU. Pour les comparer sur des jeux de données hétérogènes, il conçoit Apairo, une architecture commune pour les charger, les synchroniser et les transformer — la graine de tout l'écosystème.",
     } : {
       kicker: 'Research · 2024–25', title: 'ENSTA Paris',
-      body: "Research internship on LiDAR-IMU SLAM — but most of the time went into the structure: designing Apairo's architecture took longer than the research itself. The seed of the whole ecosystem.",
+      body: 'Research internship: benchmarking LiDAR-IMU SLAM methods. To compare them across heterogeneous datasets, he designed Apairo, a common architecture to load, synchronize and transform them — the seed of the whole ecosystem.',
     },
     enstapfe: (l) => l === 'fr' ? {
       kicker: 'Recherche · PFE · avril–août 2026', title: 'ENSTA Paris — Barakuda',
-      body: "De retour à ENSTA pour le PFE : des modèles de traversabilité par LiDAR, passés au crible de dizaines de configurations — apprentissage faiblement supervisé, pertes pondérées, approches par graphe, voxels contre pillars. Le terrain d'essai était le sien : des mois à piloter Barakuda, un rover, à travers forêts, hautes herbes et collines pour enregistrer ses propres données.",
+      body: "De retour à ENSTA pour le PFE : des modèles de traversabilité par LiDAR, passés au crible de dizaines de configurations — apprentissage faiblement supervisé, pertes pondérées, approches par graphe, voxels contre pillars. Les données, il les a enregistrées lui-même : des mois à piloter Barakuda, un rover, à travers forêts, hautes herbes et collines.",
       meta: [
         ['Étiquetage', 'Nuages de points annotés avec ses propres outils — Toaster, Splasher — et relus dans Projector'],
-        ['Infrastructure & open-source', "L'environnement Apairo enfin achevé, pour que chaque expérience se rejoue à l'identique · contributions à TorchSparse et au jeu de données TartanDrive v2"],
+        ['Infrastructure & open-source', "L'environnement Apairo mené à terme, pour que chaque expérience se rejoue à l'identique · contributions à TorchSparse et au jeu de données TartanDrive v2"],
       ],
     } : {
       kicker: 'Research · Final-year internship · Apr–Aug 2026', title: 'ENSTA Paris — Barakuda',
-      body: 'Back at ENSTA for his final-year research internship: LiDAR traversability models, benchmarked across dozens of configurations — weakly-supervised learning, weighted losses, graph-based approaches, voxels versus pillars. The test ground was his own: months spent driving Barakuda, a rover, through forests, tall grass and hills to record his own data.',
+      body: 'Back at ENSTA for his final-year research internship: LiDAR traversability models, benchmarked across dozens of configurations — weakly-supervised learning, weighted losses, graph-based approaches, voxels versus pillars. He recorded the data himself: months spent driving Barakuda, a rover, through forests, tall grass and hills.',
       meta: [
         ['Labeling', 'Point clouds annotated with his own tools — Toaster, Splasher — reviewed in Projector'],
-        ['Infrastructure & open-source', 'Finally finished the Apairo environment, so every experiment replays identically · contributed to TorchSparse and the TartanDrive v2 dataset'],
+        ['Infrastructure & open-source', 'Completed the Apairo environment, so every experiment replays identically · contributed to TorchSparse and the TartanDrive v2 dataset'],
       ],
     },
     rubicon: (l) => l === 'fr' ? {
       kicker: 'Expérience · 2025–26', title: 'Rubicon · Bangkok',
-      body: "Stage ingénieur logiciel, seul sur le projet : migration complète de l'ERP vers Odoo 18 pour un fabricant de bijoux (~40 employés) — 25 modules sur-mesure et un pipeline d'import automatisé depuis l'ancien système. Sa propre ville sur la carte →",
+      body: "Stage ingénieur logiciel, seul sur le projet : migration complète de l'ERP vers Odoo 18 pour un fabricant de bijoux (~40 employés) — trois applications (produit & prix, ventes, production) bâties sur une trentaine de modules sur-mesure, et un pipeline d'import automatisé depuis l'ancien système. Sa propre ville sur la carte →",
     } : {
       kicker: 'Experience · 2025–26', title: 'Rubicon · Bangkok',
-      body: 'Software engineering intern, solo on the project: full ERP migration to Odoo 18 for a jewelry manufacturer (~40 staff) — 25 custom modules and an automated import pipeline from the old legacy system. Has its own city on the map →',
+      body: 'Software engineering intern, solo on the project: full ERP migration to Odoo 18 for a jewelry manufacturer (~40 staff) — three applications (product & pricing, sales, production) built on some thirty custom modules, and an automated import pipeline from the legacy system. Has its own city on the map →',
     },
     contact: (l) => l === 'fr' ? {
       kicker: 'Dire bonjour', title: 'Augustin Bresset',
@@ -397,7 +397,7 @@ export const POIS = {
     },
     conveyor: (l) => l === 'fr' ? {
       kicker: 'Le voyage des données', title: 'Les Voies',
-      body: "Un rosbag arrive : l'extracteur le décharge, le préprocess le nettoie, puis la synchronisation aligne chaque capteur — à sa propre fréquence — sur une même horloge. Les trames hors tolérance sont écartées, jamais maquillées.",
+      body: "Un rosbag arrive : l'extracteur le décharge, le prétraitement le nettoie, puis la synchronisation aligne chaque capteur — à sa propre fréquence — sur une même horloge. Les trames hors tolérance sont écartées, jamais maquillées.",
       figure: FIG_APAIRO_SYNC, caption: 'Quatre flux, un même temps.',
     } : {
       kicker: "The data's journey", title: 'The Lanes',
@@ -424,7 +424,7 @@ export const POIS = {
       links: [['Démo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     } : {
       kicker: '3D LiDAR · Annotation', title: 'Toaster',
-      body: 'Label 3D point clouds as fast as possible: you select, the segmenter does the rest — a whole object labelled in one click.',
+      body: 'Label 3D point clouds as fast as possible: you select, the segmenter does the rest — a whole object labeled in one click.',
       links: [['Demo ↗', 'https://huggingface.co/spaces/SmaugC137/toaster'], ['GitHub ↗', 'https://github.com/augustin-bresset/toaster']],
     },
     landmark: (l) => l === 'fr' ? {
@@ -502,7 +502,7 @@ export const POIS = {
       meta: [['Stack', 'Python · NumPy · FastAPI · Three.js']],
     } : {
       kicker: "The critics' screening", title: 'The Confusion Booth',
-      body: "Two labelings, one green reel and one red: true/false positives and negatives colour every point, precision/recall/IoU recomputed live. But the booth doesn't just compare — it also replays any transformation (frame, filter, projection) directly on the scene, so you see the effect before you keep it.",
+      body: "Two labelings, one green reel and one red: true/false positives and negatives color every point, precision/recall/IoU recomputed live. But the booth doesn't just compare — it also replays any transformation (frame, filter, projection) directly on the scene, so you see the effect before you keep it.",
       meta: [['Stack', 'Python · NumPy · FastAPI · Three.js']],
     },
   },
@@ -510,37 +510,37 @@ export const POIS = {
   rubicon: {
     tower: (l) => l === 'fr' ? {
       kicker: 'Stage solo · Bangkok, 2025–26', title: 'Rubicon',
-      body: "Une manufacture de bijoux franco-thaïlandaise (~40 salariés), qui vend à travers les grands salons professionnels internationaux. Envoyé seul pour toute la mission : un mois d'audit complet d'abord — le poste de chacun, tous les processus métier, l'usage de chaque logiciel vue par vue, action par action — puis la reconstruction de chaque outil sur Odoo 18, modernisé sans jamais perdre l'utilisateur : mêmes repères, sans jamais arrêter la production.",
-      meta: [['Rôle', 'Ingénieur logiciel — audit puis développement, seul du début à la fin'], ['Durée', '13 mois, toujours actif']],
+      body: "Une manufacture de bijoux franco-thaïlandaise (~40 salariés), qui vend à travers les grands salons professionnels internationaux. Envoyé seul pour toute la mission : un mois d'audit complet d'abord — le poste de chacun, tous les processus métier, l'usage de chaque logiciel vue par vue, action par action — puis la reconstruction de chaque outil sur Odoo 18, modernisé sans dépayser l'utilisateur — mêmes repères — et sans jamais arrêter la production.",
+      meta: [['Rôle', 'Ingénieur logiciel — audit puis développement, seul du début à la fin'], ['Durée', 'Depuis juin 2025, toujours en cours']],
     } : {
       kicker: 'Solo internship · Bangkok, 2025–26', title: 'Rubicon',
-      body: 'A Franco-Thai jewelry manufacturer (~40 staff) selling through major international trade fairs. Sent alone for the whole mission: a month-long full audit first — every role, every business process, every piece of software in use, view by view and action by action — then rebuilding each tool on Odoo 18, modernized without ever losing the user: same landmarks, without ever stopping production.',
-      meta: [['Role', 'Software engineer — audit, then development, solo start to finish'], ['Duration', '13 months, still active']],
+      body: 'A Franco-Thai jewelry manufacturer (~40 staff) selling through major international trade fairs. Sent alone for the whole mission: a month-long full audit first — every role, every business process, every piece of software in use, view by view and action by action — then rebuilding each tool on Odoo 18, modernized without disorienting the user — same landmarks — and without ever stopping production.',
+      meta: [['Role', 'Software engineer — audit, then development, solo start to finish'], ['Duration', 'Since June 2025, ongoing']],
     },
     atelier: (l) => l === 'fr' ? {
-      kicker: 'PDP & Suivi de production', title: "L'Atelier",
+      kicker: 'PDP & PCS · Produit et production', title: "L'Atelier",
       body: "Le back-office de l'atelier : catalogue de pierres, cours du jour des métaux, coûts de façon, moteur de calcul de prix, gestion des modèles et variantes. Et sur le plancher de production : lecteur code-barres à chaque poste, temps et poids contrôlés en direct.",
-      meta: [['Échelle', 'Des tables de +100 000 lignes — pierres, produits, modèles']],
+      meta: [['Échelle', '48 699 produits, 13 056 modèles, 256 004 compositions pierre-produit']],
     } : {
-      kicker: 'PDP & Production Tracking', title: 'The Atelier',
+      kicker: 'PDP & PCS · Product and production', title: 'The Atelier',
       body: "The atelier's back office: a stone catalog, daily metal market prices, labor costing, a price-computation engine, model & variant management. And on the shop floor: a barcode reader at every station, time and weight checked live.",
-      meta: [['Scale', 'Tables with 100,000+ rows — stones, products, models']],
+      meta: [['Scale', '48,699 products, 13,056 models, 256,004 stone-to-product compositions']],
     },
     ledger: (l) => l === 'fr' ? {
       kicker: 'SIS · Ventes', title: 'Le Comptoir',
       body: "Devis, commandes, factures, clients et fournisseurs — et une analyse croisée dynamique des ventes par salon, région et pays, exportable en un clic vers Excel.",
-      meta: [['Échelle', '247 893 compositions pierre-produit importées']],
+      meta: [['Échelle', '18 656 documents et 210 487 lignes importés']],
     } : {
       kicker: 'SIS · Sales', title: 'The Trading Post',
       body: 'Quotations, orders, invoices, clients and vendors — plus a pivot sales-analysis tool sliced by trade fair, region and country, one click from an Excel export.',
-      meta: [['Scale', '247,893 stone-to-product compositions imported']],
+      meta: [['Scale', '18,656 documents and 210,487 lines imported']],
     },
     roots: (l) => l === 'fr' ? {
       kicker: 'Migration · Sous le parvis', title: 'Les Racines',
-      body: "Sous le parvis envahi de lianes dort encore JMS : plus de vingt ans d'activité en MS-SQL, chaque bijou lié à ses pierres, son historique de prix, ses commandes, ses clients. Un pipeline d'import a remonté toute cette toile vers Odoo — jusqu'aux 3,3 Go de photos produit — sans casser un seul lien, sans jamais interrompre la production.",
+      body: "Sous le parvis envahi de lianes dort encore JMS : plus de vingt ans d'activité en MS-SQL, chaque bijou lié à ses pierres, son historique de prix, ses commandes, ses clients. Un pipeline d'import a remonté toute cette toile vers Odoo — jusqu'aux 3,2 Go de photos produit —, vérifiée valeur par valeur contre l'ancien système, sans jamais interrompre la production.",
     } : {
       kicker: 'Migration · Beneath the forecourt', title: 'The Roots',
-      body: 'Below the vine-choked forecourt, JMS still sleeps: twenty-plus years of activity in MS-SQL, every piece of jewelry linked to its stones, its price history, its orders, its clients. An import pipeline pulled that whole web up into Odoo — down to 3.3GB of product photos — without breaking a single link, without ever stopping production.',
+      body: 'Below the vine-choked forecourt, JMS still sleeps: twenty-plus years of activity in MS-SQL, every piece of jewelry linked to its stones, its price history, its orders, its clients. An import pipeline pulled that whole web up into Odoo — down to 3.2 GB of product photos — checked value by value against the old system, without ever stopping production.',
     },
   },
   hubs: {
@@ -548,24 +548,24 @@ export const POIS = {
       kicker: 'Audio · Synchronisation', title: 'Hubs',
       body: "La même musique, au même instant, sur plusieurs appareils — ordinateur, téléphones — chacun sur sa propre enceinte. Synchroniser les horloges ne suffit pas : une enceinte Bluetooth ajoute 100 à 400 ms que ni le téléphone ni le navigateur ne connaissent. Hubs mesure donc au micro ce qu'on entend vraiment, puis compense chaque appareil.",
       meta: [
-        ['Mesuré', 'Un seul essai sur du vrai matériel (9 oct. 2026) : deux enceintes Bluetooth, environ 150 et 400 ms de latence — écart médian d’1 ms au plus après calibration'],
+        ['Mesuré', 'Sur du vrai matériel : un ordinateur et un téléphone, chacun sur une enceinte Bluetooth (environ 150 et 400 ms de latence). Après calibration, écart médian d’1 ms au plus, et moins de 3 ms sur 204 mesures sur 205'],
         ['Stack', 'JavaScript · Web Audio · Node sans dépendance · Java (Android)'],
       ],
     } : {
       kicker: 'Audio · Sync', title: 'Hubs',
       body: "The same music, at the same instant, on several devices — a computer, phones — each on its own speaker. Syncing clocks isn't enough: a Bluetooth speaker adds 100 to 400 ms that neither the phone nor the browser knows about. So Hubs measures what is actually heard, with a microphone, then compensates each device.",
       meta: [
-        ['Measured', 'A single test on real hardware (Oct 9, 2026): two Bluetooth speakers, about 150 and 400 ms of latency — a median gap of 1 ms at most after calibration'],
+        ['Measured', 'On real hardware: a computer and a phone, each on a Bluetooth speaker (about 150 and 400 ms of latency). After calibration, a median gap of 1 ms at most, and under 3 ms in 204 of 205 measurements'],
         ['Stack', 'JavaScript · Web Audio · dependency-free Node · Java (Android)'],
       ],
     },
     calibration: (l) => l === 'fr' ? {
       kicker: 'Calibration', title: 'Un seul micro pour tous',
-      body: "Chaque appareil joue à son tour un bref balayage ; le micro le retrouve par corrélation croisée et en tire le retard de cet appareil. Comme le même micro mesure tout le monde, sa propre latence s'annule dans les écarts. La synchro n'est exacte qu'à cet endroit : le son met environ 3 ms à parcourir un mètre.",
+      body: "Chaque appareil joue à son tour un bref balayage ; le micro le retrouve par corrélation croisée et en tire le retard de cet appareil. Comme le même micro mesure tout le monde, sa propre latence s'annule dans les écarts. La synchro est calée sur l'endroit où le micro écoute : le son met environ 3 ms à parcourir un mètre.",
       figure: FIG_HUBS_CHIRP, caption: 'Le balayage émis, et le pic qui dit quand il est arrivé.',
     } : {
       kicker: 'Calibration', title: 'One Microphone for All',
-      body: "Each device in turn plays a short sweep; the microphone finds it by cross-correlation and reads off that device's delay. Because the same microphone measures everyone, its own latency cancels out of the gaps. Sync is exact at that one spot only: sound takes about 3 ms to cover a metre.",
+      body: "Each device in turn plays a short sweep; the microphone finds it by cross-correlation and reads off that device's delay. Because the same microphone measures everyone, its own latency cancels out of the gaps. Sync is set for the spot where the microphone listens: sound takes about 3 ms to cover a meter.",
       figure: FIG_HUBS_CHIRP, caption: 'The sweep that is played, and the peak that says when it landed.',
     },
     spectrum: (l) => l === 'fr' ? {
@@ -590,14 +590,14 @@ export const POIS = {
       kicker: 'Direct', title: 'Ce qui joue ici, partout',
       body: "Une application, un onglet, une entrée audio : ce qui joue sur l'ordinateur ressort, synchronisé, sur tous les appareils. Le son part en tranches de 100 ms, chacune datée de l'heure de sa capture ; chaque appareil la fait entendre un retard fixe plus tard — une seconde par défaut, soit dix tranches en vol.",
       meta: [
-        ['Salles', 'Une adresse /r/CODE par salle, rejointe par un lien, sans compte'],
+        ['Salles', 'Chaque salle a sa propre adresse : on la rejoint en ouvrant un lien, sans créer de compte'],
         ['Android', 'Une application garde la salle en lecture, écran éteint'],
       ],
     } : {
       kicker: 'Live', title: 'What Plays Here, Everywhere',
       body: "An application, a browser tab, an audio input: whatever plays on the computer comes out, in sync, on every device. Sound leaves in 100 ms slices, each stamped with the time it was captured; every device plays it a fixed delay later — one second by default, so ten slices in flight.",
       meta: [
-        ['Rooms', 'One /r/CODE address per room, joined by a link, no account'],
+        ['Rooms', 'Each room has its own address: open the link to join, no account needed'],
         ['Android', 'An app keeps the room playing with the screen off'],
       ],
     },
@@ -608,7 +608,7 @@ export const POIS = {
       body: "Des sites de portfolio codés sur mesure, que l'artiste met à jour lui-même : il clique sur une zone du site, un panneau s'ouvre à côté, il modifie, c'est enregistré. Pas de back-office à apprendre — le serveur de développement du site sert aussi d'outil d'édition. Pour rendre un site éditable, on décrit son contenu avec une seule brique, emboîtable à volonté :",
       code: CODE_FOLIOME,
       meta: [
-        ['État', "Première étape : l'édition locale. La version hébergée reste à faire."],
+        ['État', "L'édition locale fonctionne ; la version hébergée est la prochaine étape."],
         ['Stack', 'TypeScript · Astro · Preact · Hono · sharp'],
       ],
     } : {
@@ -616,7 +616,7 @@ export const POIS = {
       body: "Hand-coded portfolio sites that the artist keeps up to date alone: click a zone of the site, a panel opens beside it, change it, it's saved. No back office to learn — the site's own dev server doubles as the editing tool. To make a site editable, its content is described with a single brick that nests at will:",
       code: CODE_FOLIOME,
       meta: [
-        ['Status', 'First step: local editing. The hosted version is still to come.'],
+        ['Status', 'Local editing works; a hosted version is the next step.'],
         ['Stack', 'TypeScript · Astro · Preact · Hono · sharp'],
       ],
     },
